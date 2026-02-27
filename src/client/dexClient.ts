@@ -69,6 +69,27 @@ export interface RegistrySkill {
   visibility: string;
 }
 
+export interface ExploreToolMatch {
+  adapter_id: string;
+  tool: string;
+  toolset: string;
+  score: number;
+  description: string;
+  group: string;
+}
+
+export interface ExploreSkillMatch {
+  name: string;
+  description: string;
+  matchPercent: string;
+}
+
+export interface ExploreResult {
+  query: string;
+  tools: ExploreToolMatch[];
+  skills: ExploreSkillMatch[];
+}
+
 export class DexClient {
   private dexPath: string;
 
@@ -83,30 +104,33 @@ export class DexClient {
     this.dexPath = config.get<string>("executablePath", "dex");
   }
 
-  /** Execute a dex command and parse JSON output */
+  /** Execute a dex command and parse JSON output (falls back to stderr if stdout empty) */
   async execJson<T>(args: string[]): Promise<T> {
     try {
-      const { stdout } = await execFileAsync(this.dexPath, args, {
+      const { stdout, stderr } = await execFileAsync(this.dexPath, args, {
         timeout: 30000,
         maxBuffer: 10 * 1024 * 1024,
         env: { ...process.env },
       });
-      return JSON.parse(stdout.trim()) as T;
+      const out = stdout.trim();
+      const text = out.length > 0 ? out : stderr.trim();
+      return JSON.parse(text) as T;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`dex ${args.join(" ")} failed: ${msg}`);
     }
   }
 
-  /** Execute a dex command, return stdout as string */
+  /** Execute a dex command, return stdout as string (falls back to stderr if stdout empty) */
   async execText(args: string[]): Promise<string> {
     try {
-      const { stdout } = await execFileAsync(this.dexPath, args, {
+      const { stdout, stderr } = await execFileAsync(this.dexPath, args, {
         timeout: 30000,
         maxBuffer: 10 * 1024 * 1024,
         env: { ...process.env },
       });
-      return stdout.trim();
+      const out = stdout.trim();
+      return out.length > 0 ? out : stderr.trim();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`dex ${args.join(" ")} failed: ${msg}`);
@@ -271,6 +295,67 @@ export class DexClient {
     } catch {
       return [];
     }
+  }
+
+  /** Explore adapters and skills matching a query */
+  async explore(query: string): Promise<ExploreResult> {
+    const [toolsResult, skillsResult] = await Promise.all([
+      this.exploreJson(query),
+      this.exploreSkills(query),
+    ]);
+    return { query, tools: toolsResult, skills: skillsResult };
+  }
+
+  /** Run explore with --json for tool matches */
+  private async exploreJson(query: string): Promise<ExploreToolMatch[]> {
+    try {
+      return await this.execJson<ExploreToolMatch[]>([
+        "explore", query, "--json",
+      ]);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Run explore text output and parse @@skills table */
+  private async exploreSkills(query: string): Promise<ExploreSkillMatch[]> {
+    try {
+      const text = await this.execText(["explore", query]);
+      return this.parseExploreSkillsTable(text);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Parse @@skills section from explore text output */
+  private parseExploreSkillsTable(text: string): ExploreSkillMatch[] {
+    const skills: ExploreSkillMatch[] = [];
+    let inSkills = false;
+
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith("@@skills")) {
+        inSkills = true;
+        continue;
+      }
+      if (inSkills && trimmed.startsWith("@@")) {
+        break; // Hit next section
+      }
+
+      if (!inSkills || !line.includes("\u2502")) { continue; }
+
+      const cells = line.split("\u2502").map((c) => c.trim());
+      const filtered = cells.filter((_, i) => i > 0 && i < cells.length - 1);
+      if (filtered.length < 3) { continue; }
+
+      const [name, description, matchPercent] = filtered;
+      if (name === "Name" || !name) { continue; }
+
+      skills.push({ name, description, matchPercent });
+    }
+
+    return skills;
   }
 
   /** Parse @@section-based whoami output */

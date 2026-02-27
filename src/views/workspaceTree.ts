@@ -44,7 +44,7 @@ export class WorkspaceTreeItem extends vscode.TreeItem {
           `| Responses | ${this.ws.responseCount} |`,
           `| Created | ${this.ws.createdAt} |`,
         ].join("\n"));
-        this.iconPath = new vscode.ThemeIcon("database");
+        this.iconPath = new vscode.ThemeIcon("window");
         this.contextValue = this.ws.isActive ? "workspace-active" : "workspace";
         break;
 

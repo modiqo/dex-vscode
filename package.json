@@ -1,6 +1,6 @@
 {
   "name": "modiqo",
-  "displayName": "modiqo",
+  "displayName": "Modiqo",
   "description": "Execution Context Engineering — adapter explorer, flow runner, and workspace dashboard for dex",
   "version": "0.1.0",
   "publisher": "modiqo",
@@ -24,8 +24,8 @@
       "activitybar": [
         {
           "id": "modiqo-explorer",
-          "title": "modiqo",
-          "icon": "media/dex-icon.svg"
+          "title": "Modiqo",
+          "icon": "media/dex-icon.png"
         }
       ]
     },
@@ -49,6 +49,11 @@
         {
           "id": "modiqo-registry",
           "name": "Registry",
+          "type": "tree"
+        },
+        {
+          "id": "modiqo-explore",
+          "name": "Explore",
           "type": "tree"
         }
       ]
@@ -123,6 +128,24 @@
         "title": "Show Registry Overview",
         "category": "modiqo",
         "icon": "$(graph)"
+      },
+      {
+        "command": "modiqo.refreshExplore",
+        "title": "Refresh Explore",
+        "category": "modiqo",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "modiqo.exploreSearch",
+        "title": "Search Adapters & Skills",
+        "category": "modiqo",
+        "icon": "$(search)"
+      },
+      {
+        "command": "modiqo.showExploreResults",
+        "title": "Show Explore Results",
+        "category": "modiqo",
+        "icon": "$(open-preview)"
       }
     ],
     "menus": {
@@ -156,6 +179,21 @@
           "command": "modiqo.showRegistryOverview",
           "when": "view == modiqo-registry",
           "group": "navigation"
+        },
+        {
+          "command": "modiqo.refreshExplore",
+          "when": "view == modiqo-explore",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.exploreSearch",
+          "when": "view == modiqo-explore",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.showExploreResults",
+          "when": "view == modiqo-explore",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -186,7 +224,7 @@
       ]
     },
     "configuration": {
-      "title": "modiqo",
+      "title": "Modiqo",
       "properties": {
         "modiqo.executablePath": {
           "type": "string",

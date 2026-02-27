@@ -16,6 +16,8 @@ import {
   showRegistryDetailPanel,
   showRegistryOverviewPanel,
 } from "./panels/registryPanel";
+import { ExploreTreeProvider } from "./views/exploreTree";
+import { showExploreResultsPanel } from "./panels/explorePanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -30,12 +32,15 @@ export function activate(context: vscode.ExtensionContext): void {
   workspaceTree.setExtensionUri(context.extensionUri);
   const registryTree = new RegistryTreeProvider(client);
   registryTree.setExtensionUri(context.extensionUri);
+  const exploreTree = new ExploreTreeProvider(client);
+  exploreTree.setExtensionUri(context.extensionUri);
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("modiqo-adapters", adapterTree),
     vscode.window.registerTreeDataProvider("modiqo-flows", flowTree),
     vscode.window.registerTreeDataProvider("modiqo-workspaces", workspaceTree),
-    vscode.window.registerTreeDataProvider("modiqo-registry", registryTree)
+    vscode.window.registerTreeDataProvider("modiqo-registry", registryTree),
+    vscode.window.registerTreeDataProvider("modiqo-explore", exploreTree)
   );
 
   // Status bar
@@ -191,6 +196,42 @@ export function activate(context: vscode.ExtensionContext): void {
           showRegistryOverviewPanel(context.extensionUri, adapters, skills);
         }
       );
+    }),
+    vscode.commands.registerCommand("modiqo.refreshExplore", () => {
+      exploreTree.refresh();
+    }),
+    vscode.commands.registerCommand("modiqo.exploreSearch", async () => {
+      const query = await vscode.window.showInputBox({
+        prompt: "Search for adapters and skills by intent",
+        placeHolder: "e.g., send an email, list github issues, schedule a meeting",
+      });
+      if (!query) { return; }
+      exploreTree.search(query);
+    }),
+    vscode.commands.registerCommand("modiqo.showExploreResults", async () => {
+      if (!exploreTree.cachedResult) {
+        // Trigger a search first
+        const query = await vscode.window.showInputBox({
+          prompt: "Search for adapters and skills by intent",
+          placeHolder: "e.g., send an email, list github issues, schedule a meeting",
+        });
+        if (!query) { return; }
+
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Exploring...",
+            cancellable: false,
+          },
+          async () => {
+            await exploreTree.search(query);
+          }
+        );
+      }
+
+      if (exploreTree.cachedResult) {
+        showExploreResultsPanel(context.extensionUri, exploreTree.cachedResult);
+      }
     }),
     registerConfigureToken(client),
     registerVerifyAdapter(client),
