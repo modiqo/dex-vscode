@@ -65,6 +65,12 @@
     },
     "commands": [
       {
+        "command": "modiqo.showReference",
+        "title": "Show Reference",
+        "category": "modiqo",
+        "icon": "$(book)"
+      },
+      {
         "command": "modiqo.refreshAdapters",
         "title": "Refresh Adapters",
         "category": "modiqo",

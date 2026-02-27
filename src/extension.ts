@@ -19,6 +19,7 @@ import {
 import { ExploreTreeProvider } from "./views/exploreTree";
 import { InfoTreeProvider } from "./views/infoTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
+import { showReferencePanel } from "./panels/referencePanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -239,7 +240,10 @@ export function activate(context: vscode.ExtensionContext): void {
     registerConfigureToken(client),
     registerVerifyAdapter(client),
     registerRunFlow(client),
-    registerBrowseCatalog(client, context.extensionUri)
+    registerBrowseCatalog(client, context.extensionUri),
+    vscode.commands.registerCommand("modiqo.showReference", (args: string[]) => {
+      showReferencePanel(client, args);
+    })
   );
 
   // Refresh config when settings change
