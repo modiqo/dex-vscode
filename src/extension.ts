@@ -17,6 +17,7 @@ import {
   showRegistryOverviewPanel,
 } from "./panels/registryPanel";
 import { ExploreTreeProvider } from "./views/exploreTree";
+import { InfoTreeProvider } from "./views/infoTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 
@@ -24,6 +25,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const client = new DexClient();
 
   // Tree views
+  const infoTree = new InfoTreeProvider(client);
   const adapterTree = new AdapterTreeProvider(client);
   adapterTree.setExtensionUri(context.extensionUri);
   const flowTree = new FlowTreeProvider(client);
@@ -36,6 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
   exploreTree.setExtensionUri(context.extensionUri);
 
   context.subscriptions.push(
+    vscode.window.registerTreeDataProvider("modiqo-info", infoTree),
     vscode.window.registerTreeDataProvider("modiqo-adapters", adapterTree),
     vscode.window.registerTreeDataProvider("modiqo-flows", flowTree),
     vscode.window.registerTreeDataProvider("modiqo-workspaces", workspaceTree),

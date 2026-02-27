@@ -90,6 +90,11 @@ export interface ExploreResult {
   skills: ExploreSkillMatch[];
 }
 
+export interface DexInfo {
+  version: string;
+  folder: string;
+}
+
 export class DexClient {
   private dexPath: string;
 
@@ -161,6 +166,28 @@ export class DexClient {
   /** Check if dex binary is available */
   async isAvailable(): Promise<boolean> {
     return this.execSilent(["--version"]);
+  }
+
+  /** Get version and base folder from dex info */
+  async dexInfo(): Promise<DexInfo> {
+    try {
+      const text = await this.execText(["info"]);
+      let version = "";
+      let folder = "";
+      for (const line of text.split("\n")) {
+        const trimmed = line.trim();
+        const vMatch = trimmed.match(/^Version:\s+(.+)$/);
+        if (vMatch) { version = vMatch[1]; }
+        const pMatch = trimmed.match(/^Adapters:\s+(.+)$/);
+        if (pMatch) {
+          // Derive base folder: strip trailing /adapters
+          folder = pMatch[1].replace(/\/adapters$/, "");
+        }
+      }
+      return { version, folder };
+    } catch {
+      return { version: "", folder: "" };
+    }
   }
 
   /** Get adapter list — parses text output until --output=json is added */

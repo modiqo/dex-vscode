@@ -32,6 +32,11 @@
     "views": {
       "modiqo-explorer": [
         {
+          "id": "modiqo-info",
+          "name": "Info",
+          "type": "tree"
+        },
+        {
           "id": "modiqo-adapters",
           "name": "Adapters",
           "type": "tree"
