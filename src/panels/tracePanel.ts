@@ -72,7 +72,14 @@ export function showTracePanel(
     "modiqo.trace",
     `Trace: ${ws.name}`,
     vscode.ViewColumn.One,
-    { enableScripts: true }
+    {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
+    }
+  );
+
+  const d3Uri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, "media", "d3-trace.min.js")
   );
 
   panel.webview.html = buildTraceHtml(
@@ -83,7 +90,8 @@ export function showTracePanel(
     totalTokensIn,
     totalTokensOut,
     successCount,
-    throughput
+    throughput,
+    d3Uri.toString()
   );
 }
 
@@ -207,7 +215,8 @@ function buildTraceHtml(
   totalTokensIn: number,
   totalTokensOut: number,
   successCount: number,
-  throughput: number
+  throughput: number,
+  d3ScriptUri: string
 ): string {
   const dataJson = JSON.stringify(bars);
   const tokenInPct = totalTokens > 0 ? Math.round((totalTokensIn / totalTokens) * 100) : 50;
@@ -248,10 +257,10 @@ function buildTraceHtml(
   .header h1 { font-size: 1.4em; font-weight: 600; }
   .header .subtitle { color: var(--fg-dim); font-size: 0.9em; margin-top: 4px; }
 
-  /* ── Stats ── */
+  /* Stats */
   .stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 14px;
     margin-bottom: 32px;
   }
@@ -299,256 +308,91 @@ function buildTraceHtml(
     margin-top: 8px;
   }
 
-  /* Token donut */
   .donut {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
+    width: 36px; height: 36px; border-radius: 50%;
+    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
   }
-
   .donut-hole {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
+    width: 20px; height: 20px; border-radius: 50%;
     background: var(--card-bg);
-    position: absolute;
-    top: 8px;
-    left: 8px;
+    position: absolute; top: 8px; left: 8px;
   }
 
-  /* Success ring */
   .success-ring {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
+    width: 36px; height: 36px; border-radius: 50%;
+    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
   }
-
   .success-ring-hole {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
+    width: 22px; height: 22px; border-radius: 50%;
     background: var(--card-bg);
-    position: absolute;
-    top: 7px;
-    left: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.55em;
-    font-weight: 700;
-    color: var(--success);
+    position: absolute; top: 7px; left: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.55em; font-weight: 700; color: var(--success);
   }
 
-  /* Duration breakdown bar */
   .duration-breakdown {
-    display: flex;
-    height: 4px;
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 10px;
-    gap: 1px;
+    display: flex; height: 4px; border-radius: 2px;
+    overflow: hidden; margin-top: 10px; gap: 1px;
   }
+  .duration-seg { height: 100%; border-radius: 1px; min-width: 2px; }
 
-  .duration-seg {
-    height: 100%;
-    border-radius: 1px;
-    min-width: 2px;
-  }
+  /* Timeline */
+  #chart-container { width: 100%; margin-bottom: 8px; }
+  #chart-container svg { display: block; width: 100%; }
 
-  /* ── Timeline ── */
-  .timeline-container {
-    position: relative;
-    margin-bottom: 8px;
-  }
+  .bar-rect { cursor: pointer; transition: opacity 0.12s; }
+  .bar-rect:hover { opacity: 0.85; }
 
-  .gridlines {
-    position: absolute;
-    top: 0;
-    left: 200px;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-  }
+  .axis-line { stroke: var(--border); stroke-width: 1; }
+  .grid-line { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3,3; opacity: 0.25; }
 
-  .gridline {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--border);
-    opacity: 0.25;
-  }
-
-  .chart-row {
-    display: flex;
-    align-items: center;
-    min-height: 36px;
-    position: relative;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
-    transition: background 0.15s;
-  }
-
-  .chart-row:hover {
-    background: color-mix(in srgb, var(--accent) 4%, transparent);
-  }
-
-  .chart-label {
-    width: 200px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.85em;
-    padding: 8px 0;
-  }
-
-  .chart-label .rid {
-    color: var(--fg-dim);
-    font-variant-numeric: tabular-nums;
+  .label-text {
     font-family: var(--mono);
-    font-size: 0.85em;
-    width: 30px;
-    text-align: right;
+    font-size: 11px;
+    fill: var(--fg-dim);
   }
-
-  .chart-label .method {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .method-text {
+    font-size: 12px;
     font-weight: 500;
+    fill: var(--fg);
   }
-
-  .chart-bar-area {
-    flex: 1;
-    position: relative;
-    height: 20px;
-  }
-
-  .flame-bar {
-    position: absolute;
-    border-radius: 5px;
-    cursor: pointer;
-    min-width: 6px;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    transition: transform 0.1s, box-shadow 0.15s;
-  }
-
-  .flame-bar:hover {
-    transform: scaleY(1.15);
-    box-shadow: 0 2px 12px rgba(78, 201, 176, 0.3);
-    z-index: 5;
-  }
-
-  .flame-bar.error:hover {
-    box-shadow: 0 2px 12px rgba(241, 76, 76, 0.3);
-  }
-
-  .flame-bar.success {
-    background: linear-gradient(90deg, var(--success-dark), var(--success));
-  }
-
-  .flame-bar.error {
-    background: linear-gradient(90deg, var(--error-dark), var(--error));
-  }
-
-  /* Nested tool segments inside batch bars */
-  .tool-segment {
-    height: 100%;
-    flex-shrink: 0;
-    border-right: 1px solid rgba(255,255,255,0.15);
-    position: relative;
-  }
-
-  .tool-segment:last-child {
-    border-right: none;
-  }
-
-  .bar-meta {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.72em;
-    color: var(--fg-dim);
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+  .meta-text {
     font-family: var(--mono);
+    font-size: 10px;
+    fill: var(--fg-dim);
   }
-
-  /* Thinking sub-row (QueryRead/QueryExtract cross-references) */
-  .thinking-row {
-    display: flex;
-    align-items: center;
-    min-height: 24px;
-    padding: 2px 0 2px 200px;
-    font-size: 0.75em;
-    color: var(--fg-dim);
+  .think-text {
     font-family: var(--mono);
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 10%, transparent);
-    gap: 8px;
+    font-size: 10px;
+    fill: var(--fg-dim);
+  }
+  .think-icon-text { fill: var(--accent); }
+  .think-saved-text { fill: var(--success); font-weight: 500; }
+  .think-var-text { fill: var(--orange); }
+  .axis-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    fill: var(--fg-dim);
   }
 
-  .thinking-row .think-icon {
-    color: var(--accent);
-    font-size: 0.9em;
-    flex-shrink: 0;
-  }
+  /* Detail cards (HTML below SVG) */
+  .detail-cards-container { margin-left: 0; }
 
-  .thinking-row .think-ref {
-    color: var(--fg-dim);
-    flex-shrink: 0;
-  }
-
-  .thinking-row .think-query {
-    color: var(--fg);
-    opacity: 0.8;
-  }
-
-  .thinking-row .think-tokens {
-    color: var(--fg-dim);
-    flex-shrink: 0;
-  }
-
-  .thinking-row .think-saved {
-    color: var(--success);
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-
-  .thinking-row .think-var {
-    color: var(--orange);
-    flex-shrink: 0;
-  }
-
-  /* Expandable detail card */
   .detail-card {
     display: none;
-    margin: 0 0 4px 200px;
     padding: 14px 18px;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 0.82em;
+    margin-bottom: 4px;
     animation: slideDown 0.2s ease;
   }
-
   @keyframes slideDown {
     from { opacity: 0; transform: translateY(-8px); }
     to { opacity: 1; transform: translateY(0); }
   }
-
-  .detail-card.open {
-    display: block;
-  }
+  .detail-card.open { display: block; }
 
   .detail-grid {
     display: grid;
@@ -556,188 +400,68 @@ function buildTraceHtml(
     gap: 12px;
     margin-bottom: 12px;
   }
-
   .detail-metric {
     padding: 8px 12px;
     background: color-mix(in srgb, var(--border) 15%, transparent);
     border-radius: 6px;
   }
-
   .detail-metric-label {
-    font-size: 0.8em;
-    color: var(--fg-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    font-size: 0.8em; color: var(--fg-dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
   }
-
   .detail-metric-value {
-    font-size: 1.2em;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    font-family: var(--mono);
+    font-size: 1.2em; font-weight: 600;
+    font-variant-numeric: tabular-nums; font-family: var(--mono);
   }
-
   .detail-metric-value.in { color: var(--accent); }
   .detail-metric-value.out { color: var(--orange); }
 
   .tool-calls-title {
-    font-size: 0.75em;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-dim);
-    margin-bottom: 6px;
+    font-size: 0.75em; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--fg-dim); margin-bottom: 6px;
   }
-
   .tool-call-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 0;
-    font-family: var(--mono);
-    font-size: 0.9em;
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 0; font-family: var(--mono); font-size: 0.9em;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
   }
-
   .tool-call-row:last-child { border-bottom: none; }
-
   .tool-call-name { font-weight: 500; }
   .tool-call-args { color: var(--fg-dim); font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* Token bar inline */
-  .token-split {
-    display: flex;
-    height: 6px;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 4px;
-    width: 100%;
-  }
+  .token-split { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px; width: 100%; }
+  .token-split-in { background: var(--accent); height: 100%; }
+  .token-split-out { background: var(--orange); height: 100%; }
 
-  .token-split-in {
-    background: var(--accent);
-    height: 100%;
-  }
-
-  .token-split-out {
-    background: var(--orange);
-    height: 100%;
-  }
-
-  /* ── Time axis ── */
-  .axis {
-    display: flex;
-    margin-left: 200px;
-    border-top: 1px solid var(--border);
-    padding-top: 6px;
-    margin-bottom: 28px;
-  }
-
-  .axis-tick {
-    flex: 1;
-    text-align: center;
-    font-size: 0.68em;
-    color: var(--fg-dim);
-    font-variant-numeric: tabular-nums;
-    font-family: var(--mono);
-  }
-
-  /* ── Token waterfall ── */
-  .waterfall-section {
-    margin-bottom: 28px;
-  }
-
+  /* Waterfall */
+  .waterfall-section { margin-bottom: 28px; }
   .waterfall-title {
-    font-size: 0.75em;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-dim);
-    margin-bottom: 10px;
+    font-size: 0.75em; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--fg-dim); margin-bottom: 10px;
   }
-
-  .waterfall-chart {
-    position: relative;
-    height: 60px;
-    margin-left: 200px;
-    border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--card-bg);
-  }
-
-  .waterfall-area {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-  }
-
-  .waterfall-fill {
-    position: absolute;
-    bottom: 0;
-  }
-
+  #waterfall-container { width: 100%; }
+  #waterfall-container svg { display: block; width: 100%; }
   .waterfall-label {
-    display: flex;
-    justify-content: space-between;
-    margin-left: 200px;
-    margin-top: 4px;
-    font-size: 0.65em;
-    color: var(--fg-dim);
-    font-family: var(--mono);
+    display: flex; justify-content: space-between;
+    margin-top: 4px; font-size: 0.65em; color: var(--fg-dim); font-family: var(--mono);
   }
 
   /* Tooltip */
   .tooltip {
-    display: none;
-    position: fixed;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 18px;
-    font-size: 0.85em;
-    pointer-events: none;
-    z-index: 100;
+    display: none; position: fixed;
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 18px; font-size: 0.85em;
+    pointer-events: none; z-index: 100;
     box-shadow: 0 6px 24px rgba(0,0,0,0.35);
-    min-width: 240px;
-    max-width: 400px;
+    min-width: 240px; max-width: 400px;
   }
+  .tooltip .tt-title { font-weight: 600; margin-bottom: 8px; font-size: 1.05em; }
+  .tooltip .tt-row { display: flex; justify-content: space-between; color: var(--fg-dim); margin: 4px 0; font-size: 0.9em; }
+  .tooltip .tt-row span { color: var(--fg); font-variant-numeric: tabular-nums; font-family: var(--mono); }
+  .tooltip .tt-divider { border-top: 1px solid var(--border); margin: 6px 0; }
+  .tooltip .tt-batch { font-size: 0.8em; color: var(--fg-dim); margin-top: 6px; }
 
-  .tooltip .tt-title {
-    font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 1.05em;
-  }
-
-  .tooltip .tt-row {
-    display: flex;
-    justify-content: space-between;
-    color: var(--fg-dim);
-    margin: 4px 0;
-    font-size: 0.9em;
-  }
-
-  .tooltip .tt-row span {
-    color: var(--fg);
-    font-variant-numeric: tabular-nums;
-    font-family: var(--mono);
-  }
-
-  .tooltip .tt-divider {
-    border-top: 1px solid var(--border);
-    margin: 6px 0;
-  }
-
-  .tooltip .tt-batch {
-    font-size: 0.8em;
-    color: var(--fg-dim);
-    margin-top: 6px;
-  }
-
-  footer {
-    margin-top: 24px;
-    font-size: 0.72em;
-    color: var(--fg-dim);
-  }
+  footer { margin-top: 24px; font-size: 0.72em; color: var(--fg-dim); }
 </style>
 </head>
 <body>
@@ -746,14 +470,12 @@ function buildTraceHtml(
     <div class="subtitle">${bars.length} responses &middot; ${fmtMs(totalMs)} total</div>
   </div>
 
-  <!-- Stats -->
   <div class="stats">
     <div class="stat-card duration">
       <div class="stat-label">Duration</div>
       <div class="stat-value">${fmtMs(totalMs)}</div>
       <div class="duration-breakdown" id="dur-breakdown"></div>
     </div>
-
     <div class="stat-card responses">
       <div class="stat-label">Responses</div>
       <div class="stat-value">${bars.length}</div>
@@ -762,7 +484,6 @@ function buildTraceHtml(
         <div class="success-ring-hole">${Math.round((successCount / bars.length) * 100)}%</div>
       </div>
     </div>
-
     <div class="stat-card tokens">
       <div class="stat-label">Tokens</div>
       <div class="stat-value">${totalTokens.toLocaleString()}</div>
@@ -771,7 +492,6 @@ function buildTraceHtml(
         <div class="donut-hole"></div>
       </div>
     </div>
-
     <div class="stat-card throughput">
       <div class="stat-label">Throughput</div>
       <div class="stat-value">${throughput.toLocaleString()}</div>
@@ -779,14 +499,12 @@ function buildTraceHtml(
     </div>
   </div>
 
-  <!-- Timeline -->
-  <div class="timeline-container" id="timeline"></div>
-  <div class="axis" id="axis"></div>
+  <div id="chart-container"></div>
+  <div class="detail-cards-container" id="detail-cards"></div>
 
-  <!-- Token Waterfall -->
   <div class="waterfall-section">
     <div class="waterfall-title">Token Consumption</div>
-    <div class="waterfall-chart" id="waterfall"></div>
+    <div id="waterfall-container"></div>
     <div class="waterfall-label">
       <span>0</span>
       <span>${totalTokens.toLocaleString()} tokens</span>
@@ -794,9 +512,9 @@ function buildTraceHtml(
   </div>
 
   <div class="tooltip" id="tooltip"></div>
-
   <footer>modiqo &middot; trace</footer>
 
+  <script src="${d3ScriptUri}"></script>
   <script>
     const data = ${dataJson};
     const totalMs = ${totalMs};
@@ -805,11 +523,9 @@ function buildTraceHtml(
     function fmtMs(ms) {
       return ms < 1000 ? Math.round(ms) + 'ms' : (ms / 1000).toFixed(1) + 's';
     }
-
     function fmtTokens(n) {
       return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n.toString();
     }
-
     function barHeight(tokens) {
       if (!tokens) return 14;
       if (tokens < 500) return 14;
@@ -817,183 +533,69 @@ function buildTraceHtml(
       if (tokens < 50000) return 18;
       return 20;
     }
-
-    const timeline = document.getElementById('timeline');
-    const tooltip = document.getElementById('tooltip');
-
-    // Gridlines
-    const gridEl = document.createElement('div');
-    gridEl.className = 'gridlines';
-    gridEl.style.position = 'absolute';
-    gridEl.style.top = '0';
-    gridEl.style.left = '200px';
-    gridEl.style.right = '0';
-    gridEl.style.bottom = '0';
-    gridEl.style.pointerEvents = 'none';
-    for (let i = 1; i <= 5; i++) {
-      const line = document.createElement('div');
-      line.className = 'gridline';
-      line.style.left = (i * 20) + '%';
-      gridEl.appendChild(line);
+    function escapeHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
-    timeline.style.position = 'relative';
-    timeline.appendChild(gridEl);
 
-    // Bars
-    data.forEach((bar, idx) => {
-      const wrapper = document.createElement('div');
-
-      const row = document.createElement('div');
-      row.className = 'chart-row';
-      row.style.cursor = 'pointer';
-
-      const label = document.createElement('div');
-      label.className = 'chart-label';
-      label.innerHTML = '<span class="rid">@' + bar.response_id + '</span><span class="method">' + escapeHtml(bar.method) + '</span>';
-      row.appendChild(label);
-
-      const area = document.createElement('div');
-      area.className = 'chart-bar-area';
-
-      const h = barHeight(bar.tokens_total);
-      const flameBar = document.createElement('div');
-      flameBar.className = 'flame-bar ' + (bar.has_error ? 'error' : 'success');
-      const left = (bar.start_offset_ms / totalMs) * 100;
-      const width = Math.max((bar.duration_ms / totalMs) * 100, 0.8);
-      flameBar.style.left = left + '%';
-      flameBar.style.width = width + '%';
-      flameBar.style.height = h + 'px';
-      flameBar.style.top = ((20 - h) / 2) + 'px';
-
-      // Nested tool segments for batch calls
-      if (bar.tool_calls.length > 1) {
-        bar.tool_calls.forEach((tc, i) => {
-          const seg = document.createElement('div');
-          seg.className = 'tool-segment';
-          seg.style.flex = '1';
-          seg.style.opacity = 0.7 + (i % 2) * 0.3;
-          flameBar.appendChild(seg);
-        });
-      }
-
-      // Tooltip on hover
-      flameBar.addEventListener('mousemove', e => {
-        tooltip.style.display = 'block';
-        tooltip.style.left = Math.min(e.clientX + 14, window.innerWidth - 420) + 'px';
-        tooltip.style.top = (e.clientY - 10) + 'px';
-
-        let html = '<div class="tt-title">@' + bar.response_id + ' ' + escapeHtml(bar.method) + '</div>';
-        html += '<div class="tt-row">Duration <span>' + fmtMs(bar.duration_ms) + '</span></div>';
-        html += '<div class="tt-row">Tokens in <span>' + bar.tokens_in.toLocaleString() + '</span></div>';
-        html += '<div class="tt-row">Tokens out <span>' + bar.tokens_out.toLocaleString() + '</span></div>';
-        html += '<div class="tt-row">Total <span>' + bar.tokens_total.toLocaleString() + '</span></div>';
-        html += '<div class="tt-row">Offset <span>' + fmtMs(bar.start_offset_ms) + '</span></div>';
-
-        if (bar.tool_calls.length > 0) {
-          html += '<div class="tt-divider"></div>';
-          html += '<div class="tt-batch">' + bar.tool_calls.length + ' tool calls (click to expand)</div>';
-        }
-
-        tooltip.innerHTML = html;
-      });
-
-      flameBar.addEventListener('mouseout', () => { tooltip.style.display = 'none'; });
-
-      area.appendChild(flameBar);
-
-      // Meta label after bar
-      const meta = document.createElement('div');
-      meta.className = 'bar-meta';
-      meta.style.left = (left + width + 0.5) + '%';
-      meta.textContent = fmtMs(bar.duration_ms) + '  [' + fmtTokens(bar.tokens_total) + ']';
-      area.appendChild(meta);
-
-      row.appendChild(area);
-      wrapper.appendChild(row);
-
-      // Thinking sub-rows (QueryRead/QueryExtract cross-references)
+    // Compute row layout: each bar + its thinking rows
+    const ROW_H = 36;
+    const THINK_H = 22;
+    const rows = [];
+    data.forEach((bar, i) => {
+      rows.push({ type: 'bar', bar: bar, idx: i });
       if (bar.thinking && bar.thinking.length > 0) {
         bar.thinking.forEach(t => {
-          const tRow = document.createElement('div');
-          tRow.className = 'thinking-row';
-
-          let html = '<span class="think-icon">' + (t.kind === 'read' ? '&#9671;' : '&#9655;') + '</span>';
-          html += '<span class="think-ref">@' + t.source_response + '</span>';
-          html += '<span class="think-query">' + escapeHtml(t.query) + '</span>';
-
-          if (t.result_tokens > 0) {
-            html += '<span class="think-tokens">[' + fmtTokens(t.result_tokens) + 'tk]</span>';
-          }
-
-          if (t.source_tokens > 0 && t.result_tokens > 0) {
-            const saved = t.source_tokens - t.result_tokens;
-            if (saved > 0) {
-              html += '<span class="think-saved">saved ' + saved.toLocaleString() + '</span>';
-            }
-          }
-
-          if (t.variable_name) {
-            html += '<span class="think-var">$' + escapeHtml(t.variable_name) + '</span>';
-          }
-
-          html += '<span class="think-icon" style="opacity:0.4">' + (t.kind === 'read' ? '&#x3008;think&#x3009;' : '&#x3008;extract&#x3009;') + '</span>';
-
-          tRow.innerHTML = html;
-          wrapper.appendChild(tRow);
+          rows.push({ type: 'think', bar: bar, think: t, idx: i });
         });
       }
+    });
 
-      // Detail card (expandable on click)
-      const detail = document.createElement('div');
-      detail.className = 'detail-card';
-      detail.id = 'detail-' + idx;
+    const tooltip = document.getElementById('tooltip');
+    const chartContainer = document.getElementById('chart-container');
+    const detailCards = document.getElementById('detail-cards');
 
-      let detailHtml = '<div class="detail-grid">';
-      detailHtml += '<div class="detail-metric"><div class="detail-metric-label">Duration</div><div class="detail-metric-value">' + fmtMs(bar.duration_ms) + '</div></div>';
-      detailHtml += '<div class="detail-metric"><div class="detail-metric-label">Tokens In</div><div class="detail-metric-value in">' + bar.tokens_in.toLocaleString() + '</div></div>';
-      detailHtml += '<div class="detail-metric"><div class="detail-metric-label">Tokens Out</div><div class="detail-metric-value out">' + bar.tokens_out.toLocaleString() + '</div></div>';
-      detailHtml += '</div>';
+    // Create detail cards (HTML)
+    data.forEach((bar, idx) => {
+      const card = document.createElement('div');
+      card.className = 'detail-card';
+      card.id = 'detail-' + idx;
 
-      // Token split bar
+      let h = '<div class="detail-grid">';
+      h += '<div class="detail-metric"><div class="detail-metric-label">Duration</div><div class="detail-metric-value">' + fmtMs(bar.duration_ms) + '</div></div>';
+      h += '<div class="detail-metric"><div class="detail-metric-label">Tokens In</div><div class="detail-metric-value in">' + bar.tokens_in.toLocaleString() + '</div></div>';
+      h += '<div class="detail-metric"><div class="detail-metric-label">Tokens Out</div><div class="detail-metric-value out">' + bar.tokens_out.toLocaleString() + '</div></div>';
+      h += '</div>';
+
       const inPct = bar.tokens_total > 0 ? (bar.tokens_in / bar.tokens_total) * 100 : 50;
-      detailHtml += '<div class="token-split"><div class="token-split-in" style="width:' + inPct + '%"></div><div class="token-split-out" style="width:' + (100 - inPct) + '%"></div></div>';
+      h += '<div class="token-split"><div class="token-split-in" style="width:' + inPct + '%"></div><div class="token-split-out" style="width:' + (100 - inPct) + '%"></div></div>';
 
-      // Tool calls
       if (bar.tool_calls.length > 0) {
-        detailHtml += '<div style="margin-top:12px"><div class="tool-calls-title">Tool Calls (' + bar.tool_calls.length + ')</div>';
+        h += '<div style="margin-top:12px"><div class="tool-calls-title">Tool Calls (' + bar.tool_calls.length + ')</div>';
         bar.tool_calls.forEach(tc => {
           const argsStr = Object.entries(tc.args).map(([k,v]) => k + '=' + JSON.stringify(v)).join(', ');
-          detailHtml += '<div class="tool-call-row"><span class="tool-call-name">' + escapeHtml(tc.name) + '</span><span class="tool-call-args">' + escapeHtml(argsStr) + '</span></div>';
+          h += '<div class="tool-call-row"><span class="tool-call-name">' + escapeHtml(tc.name) + '</span><span class="tool-call-args">' + escapeHtml(argsStr) + '</span></div>';
         });
-        detailHtml += '</div>';
+        h += '</div>';
       }
 
-      // Thinking / cross-references
       if (bar.thinking && bar.thinking.length > 0) {
-        detailHtml += '<div style="margin-top:12px"><div class="tool-calls-title">Thinking (' + bar.thinking.length + ')</div>';
+        h += '<div style="margin-top:12px"><div class="tool-calls-title">Thinking (' + bar.thinking.length + ')</div>';
         bar.thinking.forEach(t => {
           const saved = t.source_tokens > 0 && t.result_tokens > 0 ? t.source_tokens - t.result_tokens : 0;
-          detailHtml += '<div class="tool-call-row">';
-          detailHtml += '<span class="tool-call-name" style="color:var(--accent)">' + (t.kind === 'read' ? 'read' : 'extract') + '</span>';
-          detailHtml += '<span class="tool-call-args">@' + t.source_response + ' ' + escapeHtml(t.query);
-          if (t.result_tokens > 0) detailHtml += '  [' + t.result_tokens.toLocaleString() + ' tk]';
-          if (saved > 0) detailHtml += '  saved ' + saved.toLocaleString();
-          if (t.variable_name) detailHtml += '  &rarr; $' + escapeHtml(t.variable_name);
-          detailHtml += '</span>';
-          detailHtml += '</div>';
+          h += '<div class="tool-call-row">';
+          h += '<span class="tool-call-name" style="color:var(--accent)">' + (t.kind === 'read' ? 'read' : 'extract') + '</span>';
+          h += '<span class="tool-call-args">@' + t.source_response + ' ' + escapeHtml(t.query);
+          if (t.result_tokens > 0) h += '  [' + t.result_tokens.toLocaleString() + ' tk]';
+          if (saved > 0) h += '  saved ' + saved.toLocaleString();
+          if (t.variable_name) h += '  &rarr; $' + escapeHtml(t.variable_name);
+          h += '</span></div>';
         });
-        detailHtml += '</div>';
+        h += '</div>';
       }
 
-      detail.innerHTML = detailHtml;
-      wrapper.appendChild(detail);
-
-      // Click to toggle detail
-      row.addEventListener('click', () => {
-        detail.classList.toggle('open');
-      });
-
-      timeline.appendChild(wrapper);
+      card.innerHTML = h;
+      detailCards.appendChild(card);
     });
 
     // Duration breakdown in stats
@@ -1008,38 +610,337 @@ function buildTraceHtml(
       durBreakdown.appendChild(seg);
     });
 
-    // Axis
-    const axisEl = document.getElementById('axis');
-    for (let i = 0; i <= 5; i++) {
-      const tick = document.createElement('div');
-      tick.className = 'axis-tick';
-      tick.textContent = fmtMs(Math.round((i / 5) * totalMs));
-      axisEl.appendChild(tick);
+    // D3 rendering
+    function render() {
+      chartContainer.innerHTML = '';
+      document.getElementById('waterfall-container').innerHTML = '';
+
+      const containerWidth = chartContainer.clientWidth;
+      if (containerWidth < 100) return;
+
+      const margin = {
+        top: 12,
+        right: 80,
+        bottom: 32,
+        left: Math.min(Math.max(containerWidth * 0.2, 120), 200)
+      };
+      const totalHeight = rows.reduce((s, r) => s + (r.type === 'bar' ? ROW_H : THINK_H), 0);
+      const width = containerWidth - margin.left - margin.right;
+      const height = totalHeight;
+
+      // X scale: time
+      const x = d3.scaleLinear().domain([0, totalMs]).range([0, width]);
+
+      // SVG
+      const svg = d3.select(chartContainer)
+        .append('svg')
+        .attr('width', containerWidth)
+        .attr('height', height + margin.top + margin.bottom);
+
+      // Gradient defs
+      const defs = svg.append('defs');
+
+      const successGrad = defs.append('linearGradient').attr('id', 'grad-success')
+        .attr('x1', '0%').attr('x2', '100%');
+      successGrad.append('stop').attr('offset', '0%').attr('stop-color', '#2d8a6e');
+      successGrad.append('stop').attr('offset', '100%').attr('stop-color', '#4ec9b0');
+
+      const errorGrad = defs.append('linearGradient').attr('id', 'grad-error')
+        .attr('x1', '0%').attr('x2', '100%');
+      errorGrad.append('stop').attr('offset', '0%').attr('stop-color', '#a33');
+      errorGrad.append('stop').attr('offset', '100%').attr('stop-color', '#f14c4c');
+
+      // Waterfall area gradient
+      const wfGrad = defs.append('linearGradient').attr('id', 'grad-waterfall')
+        .attr('x1', '0%').attr('y1', '100%').attr('x2', '0%').attr('y2', '0%');
+      wfGrad.append('stop').attr('offset', '0%').attr('stop-color', '#4ec9b0').attr('stop-opacity', 0.05);
+      wfGrad.append('stop').attr('offset', '100%').attr('stop-color', '#4ec9b0').attr('stop-opacity', 0.35);
+
+      const g = svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+      // Gridlines
+      const ticks = x.ticks(6);
+      g.selectAll('.grid-line')
+        .data(ticks)
+        .enter()
+        .append('line')
+        .attr('class', 'grid-line')
+        .attr('x1', d => x(d))
+        .attr('x2', d => x(d))
+        .attr('y1', 0)
+        .attr('y2', height);
+
+      // Render rows
+      let yPos = 0;
+      rows.forEach(row => {
+        if (row.type === 'bar') {
+          const bar = row.bar;
+          const rowG = g.append('g').attr('transform', 'translate(0,' + yPos + ')');
+
+          // Row background (hover)
+          rowG.append('rect')
+            .attr('x', -margin.left)
+            .attr('width', containerWidth)
+            .attr('height', ROW_H)
+            .attr('fill', 'transparent')
+            .attr('class', 'bar-rect')
+            .on('click', () => {
+              const card = document.getElementById('detail-' + row.idx);
+              if (card) card.classList.toggle('open');
+            })
+            .on('mousemove', (e) => {
+              tooltip.style.display = 'block';
+              tooltip.style.left = Math.min(e.clientX + 14, window.innerWidth - 420) + 'px';
+              tooltip.style.top = (e.clientY - 10) + 'px';
+              let html = '<div class="tt-title">@' + bar.response_id + ' ' + escapeHtml(bar.method) + '</div>';
+              html += '<div class="tt-row">Duration <span>' + fmtMs(bar.duration_ms) + '</span></div>';
+              html += '<div class="tt-row">Tokens in <span>' + bar.tokens_in.toLocaleString() + '</span></div>';
+              html += '<div class="tt-row">Tokens out <span>' + bar.tokens_out.toLocaleString() + '</span></div>';
+              html += '<div class="tt-row">Total <span>' + bar.tokens_total.toLocaleString() + '</span></div>';
+              html += '<div class="tt-row">Offset <span>' + fmtMs(bar.start_offset_ms) + '</span></div>';
+              if (bar.tool_calls.length > 0) {
+                html += '<div class="tt-divider"></div>';
+                html += '<div class="tt-batch">' + bar.tool_calls.length + ' tool calls (click to expand)</div>';
+              }
+              tooltip.innerHTML = html;
+            })
+            .on('mouseout', () => { tooltip.style.display = 'none'; });
+
+          // Row separator
+          rowG.append('line')
+            .attr('x1', -margin.left).attr('x2', containerWidth - margin.left)
+            .attr('y1', ROW_H).attr('y2', ROW_H)
+            .attr('stroke', 'var(--border)').attr('stroke-opacity', 0.15);
+
+          // Label: @rid
+          rowG.append('text')
+            .attr('class', 'label-text')
+            .attr('x', -margin.left + 12)
+            .attr('y', ROW_H / 2)
+            .attr('dominant-baseline', 'central')
+            .attr('text-anchor', 'start')
+            .text('@' + bar.response_id);
+
+          // Label: method
+          const methodMaxW = margin.left - 55;
+          rowG.append('text')
+            .attr('class', 'method-text')
+            .attr('x', -margin.left + 50)
+            .attr('y', ROW_H / 2)
+            .attr('dominant-baseline', 'central')
+            .attr('text-anchor', 'start')
+            .attr('textLength', methodMaxW)
+            .attr('lengthAdjust', 'spacing')
+            .text(bar.method.length > Math.floor(methodMaxW / 7) ? bar.method.slice(0, Math.floor(methodMaxW / 7)) + '...' : bar.method);
+
+          // Bar rect
+          const bh = barHeight(bar.tokens_total);
+          const bx = x(bar.start_offset_ms);
+          const bw = Math.max(x(bar.start_offset_ms + bar.duration_ms) - bx, 6);
+          const by = (ROW_H - bh) / 2;
+
+          if (bar.tool_calls.length > 1) {
+            // Segmented bar for batch calls
+            const segW = bw / bar.tool_calls.length;
+            bar.tool_calls.forEach((tc, si) => {
+              rowG.append('rect')
+                .attr('x', bx + si * segW)
+                .attr('y', by)
+                .attr('width', Math.max(segW - 1, 2))
+                .attr('height', bh)
+                .attr('rx', si === 0 ? 4 : 1)
+                .attr('ry', si === 0 ? 4 : 1)
+                .attr('fill', bar.has_error ? 'url(#grad-error)' : 'url(#grad-success)')
+                .attr('opacity', 0.7 + (si % 2) * 0.3);
+            });
+            // Round right end of last segment
+            if (bar.tool_calls.length > 0) {
+              const lastSeg = rowG.selectAll('rect').filter((_, i, nodes) => i === nodes.length - 1);
+              lastSeg.attr('rx', 4).attr('ry', 4);
+            }
+          } else {
+            rowG.append('rect')
+              .attr('x', bx)
+              .attr('y', by)
+              .attr('width', bw)
+              .attr('height', bh)
+              .attr('rx', 4)
+              .attr('ry', 4)
+              .attr('fill', bar.has_error ? 'url(#grad-error)' : 'url(#grad-success)');
+          }
+
+          // Meta label after bar
+          const metaX = bx + bw + 6;
+          if (metaX + 80 < width) {
+            rowG.append('text')
+              .attr('class', 'meta-text')
+              .attr('x', metaX)
+              .attr('y', ROW_H / 2)
+              .attr('dominant-baseline', 'central')
+              .text(fmtMs(bar.duration_ms) + '  [' + fmtTokens(bar.tokens_total) + ']');
+          }
+
+          yPos += ROW_H;
+
+        } else {
+          // Thinking row
+          const t = row.think;
+          const tG = g.append('g').attr('transform', 'translate(0,' + yPos + ')');
+
+          // Separator
+          tG.append('line')
+            .attr('x1', -margin.left).attr('x2', containerWidth - margin.left)
+            .attr('y1', THINK_H).attr('y2', THINK_H)
+            .attr('stroke', 'var(--border)').attr('stroke-opacity', 0.08);
+
+          let tx = 4;
+          // Icon
+          tG.append('text')
+            .attr('class', 'think-text think-icon-text')
+            .attr('x', tx).attr('y', THINK_H / 2)
+            .attr('dominant-baseline', 'central')
+            .text(t.kind === 'read' ? '\\u25C7' : '\\u25B7');
+          tx += 16;
+
+          // @ref
+          tG.append('text')
+            .attr('class', 'think-text')
+            .attr('x', tx).attr('y', THINK_H / 2)
+            .attr('dominant-baseline', 'central')
+            .text('@' + t.source_response);
+          tx += 30;
+
+          // Query
+          const queryDisplay = t.query.length > 30 ? t.query.slice(0, 30) + '...' : t.query;
+          tG.append('text')
+            .attr('class', 'think-text')
+            .attr('x', tx).attr('y', THINK_H / 2)
+            .attr('dominant-baseline', 'central')
+            .attr('opacity', 0.7)
+            .text(queryDisplay);
+          tx += Math.min(queryDisplay.length * 6.5, width * 0.4) + 10;
+
+          // Tokens
+          if (t.result_tokens > 0) {
+            tG.append('text')
+              .attr('class', 'think-text')
+              .attr('x', tx).attr('y', THINK_H / 2)
+              .attr('dominant-baseline', 'central')
+              .text('[' + fmtTokens(t.result_tokens) + 'tk]');
+            tx += 60;
+          }
+
+          // Saved
+          if (t.source_tokens > 0 && t.result_tokens > 0) {
+            const saved = t.source_tokens - t.result_tokens;
+            if (saved > 0) {
+              tG.append('text')
+                .attr('class', 'think-text think-saved-text')
+                .attr('x', tx).attr('y', THINK_H / 2)
+                .attr('dominant-baseline', 'central')
+                .text('saved ' + saved.toLocaleString());
+              tx += 70;
+            }
+          }
+
+          // Variable
+          if (t.variable_name) {
+            tG.append('text')
+              .attr('class', 'think-text think-var-text')
+              .attr('x', tx).attr('y', THINK_H / 2)
+              .attr('dominant-baseline', 'central')
+              .text('$' + t.variable_name);
+            tx += 60;
+          }
+
+          // Kind label
+          tG.append('text')
+            .attr('class', 'think-text')
+            .attr('x', tx).attr('y', THINK_H / 2)
+            .attr('dominant-baseline', 'central')
+            .attr('opacity', 0.35)
+            .text('\\u3008' + t.kind + '\\u3009');
+
+          yPos += THINK_H;
+        }
+      });
+
+      // X axis
+      const axisG = g.append('g').attr('transform', 'translate(0,' + height + ')');
+      const xAxis = d3.axisBottom(x)
+        .ticks(6)
+        .tickFormat(d => fmtMs(d))
+        .tickSize(6)
+        .tickPadding(6);
+      axisG.call(xAxis);
+      axisG.selectAll('text').attr('class', 'axis-text');
+      axisG.select('.domain').attr('stroke', 'var(--border)').attr('stroke-opacity', 0.5);
+      axisG.selectAll('.tick line').attr('stroke', 'var(--border)').attr('stroke-opacity', 0.3);
+
+      // Token waterfall (D3 area chart)
+      const wfContainer = document.getElementById('waterfall-container');
+      const wfHeight = 60;
+      const wfSvg = d3.select(wfContainer)
+        .append('svg')
+        .attr('width', containerWidth)
+        .attr('height', wfHeight + 8);
+
+      const wfG = wfSvg.append('g').attr('transform', 'translate(' + margin.left + ',4)');
+
+      // Build waterfall data points
+      const wfData = [{ x: 0, y: 0 }];
+      let cumulative = 0;
+      data.forEach(bar => {
+        wfData.push({ x: bar.start_offset_ms, y: cumulative });
+        cumulative += bar.tokens_total;
+        wfData.push({ x: bar.start_offset_ms + bar.duration_ms, y: cumulative });
+      });
+      wfData.push({ x: totalMs, y: cumulative });
+
+      const yWf = d3.scaleLinear().domain([0, totalTokens]).range([wfHeight, 0]);
+
+      const areaGen = d3.area()
+        .x(d => x(d.x))
+        .y0(wfHeight)
+        .y1(d => yWf(d.y))
+        .curve(d3.curveMonotoneX);
+
+      wfG.append('path')
+        .datum(wfData)
+        .attr('d', areaGen)
+        .attr('fill', 'url(#grad-waterfall)');
+
+      // Waterfall stroke line
+      const lineGen = d3.area()
+        .x(d => x(d.x))
+        .y0(d => yWf(d.y))
+        .y1(d => yWf(d.y))
+        .curve(d3.curveMonotoneX);
+
+      wfG.append('path')
+        .datum(wfData)
+        .attr('d', d3.area().x(d => x(d.x)).y0(d => yWf(d.y)).y1(d => yWf(d.y)).curve(d3.curveMonotoneX))
+        .attr('fill', 'none')
+        .attr('stroke', '#4ec9b0')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-opacity', 0.6);
+
+      // Border rect
+      wfG.append('rect')
+        .attr('x', 0).attr('y', 0)
+        .attr('width', width).attr('height', wfHeight)
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--border)')
+        .attr('stroke-opacity', 0.3)
+        .attr('rx', 6);
     }
 
-    // Token waterfall
-    const waterfallEl = document.getElementById('waterfall');
-    let cumulative = 0;
-    data.forEach(bar => {
-      const startPct = (bar.start_offset_ms / totalMs) * 100;
-      const widthPct = Math.max((bar.duration_ms / totalMs) * 100, 0.5);
-      cumulative += bar.tokens_total;
-      const heightPct = totalTokens > 0 ? (cumulative / totalTokens) * 100 : 0;
+    // Initial render
+    render();
 
-      const fill = document.createElement('div');
-      fill.className = 'waterfall-fill';
-      fill.style.left = startPct + '%';
-      fill.style.width = widthPct + '%';
-      fill.style.height = heightPct + '%';
-      fill.style.background = bar.has_error ? 'var(--error)' : 'color-mix(in srgb, var(--success) 40%, transparent)';
-      fill.style.borderRadius = '2px 2px 0 0';
-      waterfallEl.appendChild(fill);
-    });
-
-    function escapeHtml(s) {
-      if (!s) return '';
-      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+    // Resize observer
+    const ro = new ResizeObserver(() => render());
+    ro.observe(chartContainer);
   </script>
 </body>
 </html>`;
