@@ -15,6 +15,7 @@ Tree view of all installed adapters with expandable detail sections:
 - **Policies** — rate limits, timeouts, retry, circuit breaker, and logging configuration parsed from `policies.json`
 
 Right-click context menu:
+
 - **Configure Token** — set a token value for adapters missing credentials
 - **Verify Connection** — run proof-of-life flow to test the adapter
 - **Browse Catalog** — search 635+ API adapters, view specification details, and get install commands
@@ -90,30 +91,30 @@ Press `F5` to launch the Extension Development Host.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `modiqo.executablePath` | `dex` | Path to the dex binary. Set this if dex is not on your PATH. |
+| `modiqo.executablePath` | `dex`    | Path to the dex binary. Set this if dex is not on your PATH. |
 
 ## Commands
 
 All commands are accessible via `Cmd+Shift+P` with the `modiqo:` prefix:
 
-| Command | Description |
-|---------|-------------|
-| `modiqo: Refresh Adapters` | Reload adapter list |
-| `modiqo: Configure Token` | Set a token for an adapter |
-| `modiqo: Verify Connection` | Run proof-of-life for an adapter |
-| `modiqo: Browse Adapter Catalog` | Search and explore available adapters |
-| `modiqo: Run Flow` | Execute a flow in the terminal |
-| `modiqo: Refresh Flows` | Reload flow list |
-| `modiqo: Refresh Workspaces` | Reload workspace list |
-| `modiqo: Show Trace Timeline` | Open Gantt timeline for a workspace |
-| `modiqo: Show Commands` | Open command request/response viewer |
-| `modiqo: Refresh Registry` | Reload registry data |
-| `modiqo: Registry Login` | Authenticate with Google or GitHub |
-| `modiqo: Show Registry Overview` | Open skill-adapter fingerprint map |
+| Command                          | Description                              |
+|----------------------------------|------------------------------------------|
+| `modiqo: Refresh Adapters`       | Reload adapter list                      |
+| `modiqo: Configure Token`        | Set a token for an adapter               |
+| `modiqo: Verify Connection`      | Run proof-of-life for an adapter         |
+| `modiqo: Browse Adapter Catalog` | Search and explore available adapters    |
+| `modiqo: Run Flow`               | Execute a flow in the terminal           |
+| `modiqo: Refresh Flows`          | Reload flow list                         |
+| `modiqo: Refresh Workspaces`     | Reload workspace list                    |
+| `modiqo: Show Trace Timeline`    | Open Gantt timeline for a workspace      |
+| `modiqo: Show Commands`          | Open command request/response viewer     |
+| `modiqo: Refresh Registry`       | Reload registry data                     |
+| `modiqo: Registry Login`         | Authenticate with Google or GitHub       |
+| `modiqo: Show Registry Overview` | Open skill-adapter fingerprint map       |
 
 ## Project Structure
 
-```
+```text
 src/
   extension.ts              Main activation and command wiring
   statusBar.ts              Status bar item
@@ -157,4 +158,4 @@ npx tsc --noEmit
 
 ## License
 
-MIT
+Business Source License 1.1 — same as [dex](https://github.com/modiqo/dex). See [LICENSE](LICENSE) for details.

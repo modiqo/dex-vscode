@@ -4,7 +4,7 @@
   "description": "Execution Context Engineering — adapter explorer, flow runner, and workspace dashboard for dex",
   "version": "0.1.0",
   "publisher": "modiqo",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/modiqo/dex-vscode"
