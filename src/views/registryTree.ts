@@ -60,7 +60,7 @@ export class RegistryTreeItem extends vscode.TreeItem {
                 dark: vscode.Uri.joinPath(this.extUri, "media", "dark", "adapter.svg"),
               }
             : new vscode.ThemeIcon("plug");
-        } else if ((this.label as string).startsWith("Skills")) {
+        } else if ((this.label as string).startsWith("Flows")) {
           this.iconPath = this.extUri
             ? {
                 light: vscode.Uri.joinPath(this.extUri, "media", "light", "flow.svg"),
@@ -175,7 +175,7 @@ export class RegistryTreeProvider
             )
         );
       }
-      if (label.startsWith("Skills")) {
+      if (label.startsWith("Flows")) {
         return this.cachedSkills.map(
           (s) =>
             new RegistryTreeItem(
@@ -261,7 +261,7 @@ export class RegistryTreeProvider
         new RegistryTreeItem(
           "loading",
           vscode.TreeItemCollapsibleState.None,
-          "Loading skills...",
+          "Loading flows...",
           undefined,
           undefined,
           this.extUri
@@ -301,7 +301,7 @@ export class RegistryTreeProvider
       return;
     }
 
-    // Refresh to show "Loading adapters/skills..." spinners
+    // Refresh to show "Loading adapters/flows..." spinners
     this._onDidChangeTreeData.fire();
 
     // Load adapters and skills in parallel
@@ -348,7 +348,7 @@ export class RegistryTreeProvider
       new RegistryTreeItem(
         "section",
         vscode.TreeItemCollapsibleState.Collapsed,
-        `Skills (${this.cachedSkills.length})`,
+        `Flows (${this.cachedSkills.length})`,
         undefined,
         undefined,
         this.extUri

@@ -50,7 +50,7 @@ export class ExploreTreeItem extends vscode.TreeItem {
 
       case "section":
         this.contextValue = "explore-section";
-        if ((this.label as string).startsWith("Skills")) {
+        if ((this.label as string).startsWith("Flows")) {
           this.iconPath = this.extUri
             ? {
                 light: vscode.Uri.joinPath(this.extUri, "media", "light", "flow.svg"),
@@ -168,7 +168,7 @@ export class ExploreTreeProvider
 
     if (element.kind === "section") {
       const label = element.label as string;
-      if (label.startsWith("Skills") && this.cachedResult) {
+      if (label.startsWith("Flows") && this.cachedResult) {
         return this.cachedResult.skills.map(
           (s) =>
             new ExploreTreeItem(
@@ -230,7 +230,7 @@ export class ExploreTreeProvider
         new ExploreTreeItem(
           "search-prompt",
           vscode.TreeItemCollapsibleState.None,
-          "Search adapters & skills...",
+          "Search adapters & flows...",
           undefined,
           undefined,
           undefined,
@@ -262,7 +262,7 @@ export class ExploreTreeProvider
         new ExploreTreeItem(
           "section",
           vscode.TreeItemCollapsibleState.Expanded,
-          `Skills (${result.skills.length})`,
+          `Flows (${result.skills.length})`,
           undefined,
           undefined,
           undefined,

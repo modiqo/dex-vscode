@@ -268,7 +268,7 @@ function buildExploreHtml(result: ExploreResult): string {
 <body>
   <div class="header">
     <h1>Explore</h1>
-    <div class="subtitle">Adapter and skill discovery</div>
+    <div class="subtitle">Adapter and flow discovery</div>
   </div>
 
   <div class="query-bar">
@@ -310,7 +310,7 @@ function buildExploreHtml(result: ExploreResult): string {
     // ── Skills section ──
     const skillsEl = document.getElementById('skills-section');
     if (skills.length > 0) {
-      let html = '<div class="section-header"><h2>Skills</h2><span class="count">' + skills.length + ' matches</span></div>';
+      let html = '<div class="section-header"><h2>Flows</h2><span class="count">' + skills.length + ' matches</span></div>';
       html += '<div class="skill-cards">';
       skills.forEach(s => {
         const pct = parseMatchPct(s.matchPercent);

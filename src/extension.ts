@@ -160,7 +160,7 @@ export function activate(context: vscode.ExtensionContext): void {
             let skills = registryTree.cachedSkills;
 
             if (!registryTree.dataLoaded) {
-              progress.report({ message: "Fetching adapters and skills..." });
+              progress.report({ message: "Fetching adapters and flows..." });
               [adapters, skills] = await Promise.all([
                 client.registryAdapterList("bootstrap"),
                 client.registrySkillList("bootstrap"),
@@ -190,7 +190,7 @@ export function activate(context: vscode.ExtensionContext): void {
           let skills = registryTree.cachedSkills;
 
           if (!registryTree.dataLoaded) {
-            progress.report({ message: "Fetching adapters and skills..." });
+            progress.report({ message: "Fetching adapters and flows..." });
             [adapters, skills] = await Promise.all([
               client.registryAdapterList("bootstrap"),
               client.registrySkillList("bootstrap"),
@@ -206,7 +206,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("modiqo.exploreSearch", async () => {
       const query = await vscode.window.showInputBox({
-        prompt: "Search for adapters and skills by intent",
+        prompt: "Search for adapters and flows by intent",
         placeHolder: "e.g., send an email, list github issues, schedule a meeting",
       });
       if (!query) { return; }
@@ -216,7 +216,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!exploreTree.cachedResult) {
         // Trigger a search first
         const query = await vscode.window.showInputBox({
-          prompt: "Search for adapters and skills by intent",
+          prompt: "Search for adapters and flows by intent",
           placeHolder: "e.g., send an email, list github issues, schedule a meeting",
         });
         if (!query) { return; }

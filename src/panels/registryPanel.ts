@@ -14,7 +14,7 @@ export function showRegistryDetailPanel(
   const title =
     kind === "adapter"
       ? `Adapter: ${(item as RegistryAdapter).name}`
-      : `Skill: ${(item as RegistrySkill).name}`;
+      : `Flow: ${(item as RegistrySkill).name}`;
 
   const panel = vscode.window.createWebviewPanel(
     "modiqo.registryDetail",
@@ -297,8 +297,8 @@ function buildOverviewHtml(
 
   <!-- Relationship graph -->
   <div class="graph-container">
-    <div class="graph-title">Skill-Adapter Fingerprint Map</div>
-    <div class="graph-subtitle">Each cell shows whether a skill binds to an adapter via fingerprint matching. Hover to see details.</div>
+    <div class="graph-title">Flow-Adapter Fingerprint Map</div>
+    <div class="graph-subtitle">Each cell shows whether a flow binds to an adapter via fingerprint matching. Hover to see details.</div>
     <div id="col-headers" class="col-headers"></div>
     <div id="relation-grid" class="relation-grid"></div>
   </div>
@@ -312,7 +312,7 @@ function buildOverviewHtml(
 
   <!-- Skills -->
   <div class="grid-header">
-    <h2>Skills</h2>
+    <h2>Flows</h2>
     <span class="count" id="skill-count"></span>
   </div>
   <div class="cards" id="skill-cards"></div>
@@ -327,7 +327,7 @@ function buildOverviewHtml(
     const tooltip = document.getElementById('tooltip');
 
     document.getElementById('adapter-count').textContent = adapters.length + ' adapters';
-    document.getElementById('skill-count').textContent = skills.length + ' skills';
+    document.getElementById('skill-count').textContent = skills.length + ' flows';
 
     // ── Build relationship grid ──────────────────────────────────
     // Skills as rows, adapters as columns
@@ -467,7 +467,7 @@ function buildAdapterDetailHtml(
             </div>`
         )
         .join("")
-    : '<div class="empty-state">No skills bound to this adapter</div>';
+    : '<div class="empty-state">No flows bound to this adapter</div>';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -579,7 +579,7 @@ function buildAdapterDetailHtml(
   </div>
 
   <div class="detail-card">
-    <h3>Bound Skills (${matchingSkills.length})</h3>
+    <h3>Bound Flows (${matchingSkills.length})</h3>
     ${skillListHtml}
   </div>
 

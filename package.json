@@ -148,7 +148,7 @@
       },
       {
         "command": "modiqo.exploreSearch",
-        "title": "Search Adapters & Skills",
+        "title": "Search Adapters & Flows",
         "category": "modiqo",
         "icon": "$(search)"
       },
