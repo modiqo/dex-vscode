@@ -721,17 +721,18 @@ function buildTraceHtml(
             .attr('text-anchor', 'start')
             .text('@' + bar.response_id);
 
-          // Label: method
-          const methodMaxW = margin.left - 55;
+          // Label: method (truncate by character count, no textLength stretching)
+          const methodMaxChars = Math.floor((margin.left - 60) / 7.5);
+          const methodLabel = bar.method.length > methodMaxChars
+            ? bar.method.slice(0, methodMaxChars) + '\u2026'
+            : bar.method;
           rowG.append('text')
             .attr('class', 'method-text')
             .attr('x', -margin.left + 50)
             .attr('y', ROW_H / 2)
             .attr('dominant-baseline', 'central')
             .attr('text-anchor', 'start')
-            .attr('textLength', methodMaxW)
-            .attr('lengthAdjust', 'spacing')
-            .text(bar.method.length > Math.floor(methodMaxW / 7) ? bar.method.slice(0, Math.floor(methodMaxW / 7)) + '...' : bar.method);
+            .text(methodLabel);
 
           // Bar rect
           const bh = barHeight(bar.tokens_total);
