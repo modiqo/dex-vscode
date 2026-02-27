@@ -1,0 +1,217 @@
+{
+  "name": "modiqo",
+  "displayName": "modiqo",
+  "description": "Execution Context Engineering — adapter explorer, flow runner, and workspace dashboard for dex",
+  "version": "0.1.0",
+  "publisher": "modiqo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modiqo/dex-vscode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "modiqo-explorer",
+          "title": "modiqo",
+          "icon": "media/dex-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "modiqo-explorer": [
+        {
+          "id": "modiqo-adapters",
+          "name": "Adapters",
+          "type": "tree"
+        },
+        {
+          "id": "modiqo-flows",
+          "name": "Flows",
+          "type": "tree"
+        },
+        {
+          "id": "modiqo-workspaces",
+          "name": "Workspaces",
+          "type": "tree"
+        },
+        {
+          "id": "modiqo-registry",
+          "name": "Registry",
+          "type": "tree"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "modiqo.refreshAdapters",
+        "title": "Refresh Adapters",
+        "category": "modiqo",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "modiqo.configureToken",
+        "title": "Configure Token",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.verifyAdapter",
+        "title": "Verify Connection",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.browseCatalog",
+        "title": "Browse Adapter Catalog",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.runFlow",
+        "title": "Run Flow",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.refreshFlows",
+        "title": "Refresh Flows",
+        "category": "modiqo",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "modiqo.refreshWorkspaces",
+        "title": "Refresh Workspaces",
+        "category": "modiqo",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "modiqo.showTrace",
+        "title": "Show Trace Timeline",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.showCommands",
+        "title": "Show Commands",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.refreshRegistry",
+        "title": "Refresh Registry",
+        "category": "modiqo",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "modiqo.registryLogin",
+        "title": "Registry Login",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.showRegistryDetail",
+        "title": "Show Registry Detail",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.showRegistryOverview",
+        "title": "Show Registry Overview",
+        "category": "modiqo",
+        "icon": "$(graph)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "modiqo.refreshAdapters",
+          "when": "view == modiqo-adapters",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.browseCatalog",
+          "when": "view == modiqo-adapters",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.refreshFlows",
+          "when": "view == modiqo-flows",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.refreshWorkspaces",
+          "when": "view == modiqo-workspaces",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.refreshRegistry",
+          "when": "view == modiqo-registry",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.showRegistryOverview",
+          "when": "view == modiqo-registry",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "modiqo.configureToken",
+          "when": "view == modiqo-adapters && viewItem == adapter-token-missing"
+        },
+        {
+          "command": "modiqo.verifyAdapter",
+          "when": "view == modiqo-adapters && viewItem =~ /^adapter/"
+        },
+        {
+          "command": "modiqo.runFlow",
+          "when": "view == modiqo-flows && viewItem == flow"
+        },
+        {
+          "command": "modiqo.showTrace",
+          "when": "view == modiqo-workspaces && viewItem =~ /^workspace/"
+        },
+        {
+          "command": "modiqo.showCommands",
+          "when": "view == modiqo-workspaces && viewItem =~ /^workspace/"
+        },
+        {
+          "command": "modiqo.registryLogin",
+          "when": "view == modiqo-registry && viewItem == registry-login"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "modiqo",
+      "properties": {
+        "modiqo.executablePath": {
+          "type": "string",
+          "default": "dex",
+          "description": "Path to the dex binary. Defaults to 'dex' (resolved from PATH)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "lint": "eslint src/",
+    "test": "node ./dist/test/runTests.js",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.0.0",
+    "mocha": "^10.0.0",
+    "typescript": "^5.5.0"
+  }
+}
