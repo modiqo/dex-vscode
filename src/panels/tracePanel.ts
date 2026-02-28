@@ -102,7 +102,6 @@ function buildTraceData(
   const bars: TraceBar[] = [];
   const commandLog = state.command_log || [];
 
-  // Collect thinking commands (QueryRead/QueryExtract) indexed by source_response
   const thinkingMap = new Map<number, ThinkingEntry[]>();
   for (const cmd of commandLog) {
     const cmdType = cmd.type.command;
@@ -139,7 +138,6 @@ function buildTraceData(
     const toolParams = body?.params as Record<string, unknown> | undefined;
     const toolName = (toolParams?.name as string) ?? method;
 
-    // Extract nested tool calls for batch operations
     const toolCalls: ToolCall[] = [];
     const calls = toolParams?.calls as Array<{ tool_name: string; arguments: Record<string, unknown> }> | undefined;
     if (calls) {
@@ -148,7 +146,6 @@ function buildTraceData(
       }
     }
 
-    // Read response file for real metrics
     const responseFile = path.join(ws.dir, ".dex", "responses", `@${rid}.json`);
     let duration = 0;
     let tokensIn = 0;
@@ -159,23 +156,17 @@ function buildTraceData(
     if (fs.existsSync(responseFile)) {
       try {
         const resp = JSON.parse(fs.readFileSync(responseFile, "utf-8"));
-
-        // Use real duration_ms from response
         duration = resp.response?.duration_ms ?? 0;
-
-        // Use real token counts
         const tokens = resp.tokens;
         if (tokens) {
           tokensIn = tokens.request_tokens ?? 0;
           tokensOut = tokens.response_tokens ?? 0;
           tokensTotal = tokens.total_tokens ?? 0;
         }
-
         hasError = resp.response?.status >= 400;
       } catch { /* skip */ }
     }
 
-    // Fallback duration estimate if response file missing
     if (duration === 0) {
       const idx = commandLog.indexOf(cmd);
       const nextCmd = commandLog[idx + 1];
@@ -207,6 +198,60 @@ function buildTraceData(
   return bars;
 }
 
+// ── Ticker helpers ───────────────────────────────────────────────
+
+function tickerBar(value: number, max: number, width: number): string {
+  const filled = max > 0 ? Math.round((value / max) * width) : 0;
+  const empty = width - filled;
+  return `<span class="tk-fill">${"\u2588".repeat(filled)}</span><span class="tk-empty">${"\u2591".repeat(empty)}</span>`;
+}
+
+function fmtTokensShort(n: number): string {
+  if (n >= 1_000_000) { return `${(n / 1_000_000).toFixed(1)}M`; }
+  if (n >= 1_000) { return `${(n / 1000).toFixed(1)}k`; }
+  return n.toString();
+}
+
+// ── Pulse Meter SVG ──────────────────────────────────────────────
+
+function buildPulseSvg(bars: TraceBar[], totalMs: number, _totalTokens: number): string {
+  if (bars.length === 0) { return ""; }
+
+  const width = 600;
+  const height = 60;
+  const maxTk = Math.max(...bars.map(b => b.tokens_total), 1);
+
+  // Build polyline points: flat baseline with spikes at each query
+  const points: string[] = [`0,${height}`];
+
+  for (const bar of bars) {
+    const x = totalMs > 0 ? (bar.start_offset_ms / totalMs) * width : 0;
+    const spikeH = Math.max((bar.tokens_total / maxTk) * (height - 10), 4);
+    const xEnd = totalMs > 0 ? ((bar.start_offset_ms + bar.duration_ms) / totalMs) * width : x + 10;
+
+    // Approach baseline, spike up, come back
+    points.push(`${Math.max(x - 4, 0)},${height}`);
+    points.push(`${x},${height - spikeH}`);
+    points.push(`${(x + xEnd) / 2},${height - spikeH * 0.3}`);
+    points.push(`${xEnd},${height - spikeH * 0.7}`);
+    points.push(`${Math.min(xEnd + 4, width)},${height}`);
+  }
+
+  points.push(`${width},${height}`);
+
+  return `<svg viewBox="0 0 ${width} ${height + 8}" class="pulse-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="pulse-fill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" style="stop-color: var(--success); stop-opacity: 0.3"/>
+        <stop offset="100%" style="stop-color: var(--success); stop-opacity: 0.02"/>
+      </linearGradient>
+    </defs>
+    <line x1="0" y1="${height}" x2="${width}" y2="${height}" style="stroke: var(--border); stroke-width: 1; stroke-dasharray: 4 4; stroke-opacity: 0.4"/>
+    <polygon points="${points.join(" ")}" style="fill: url(#pulse-fill)"/>
+    <polyline points="${points.join(" ")}" class="pulse-line" style="fill: none; stroke: var(--success); stroke-width: 1.5; stroke-linecap: round"/>
+  </svg>`;
+}
+
 function buildTraceHtml(
   wsName: string,
   bars: TraceBar[],
@@ -219,7 +264,8 @@ function buildTraceHtml(
   d3ScriptUri: string
 ): string {
   const dataJson = JSON.stringify(bars);
-  const tokenInPct = totalTokens > 0 ? Math.round((totalTokensIn / totalTokens) * 100) : 50;
+  const errorCount = bars.length - successCount;
+  const barWidth = 28;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -234,12 +280,39 @@ function buildTraceHtml(
     --border: var(--vscode-widget-border, #333);
     --accent: var(--vscode-textLink-foreground);
     --card-bg: var(--vscode-editorWidget-background, var(--bg));
+    --mono: var(--vscode-editor-font-family, 'SF Mono', 'Fira Code', monospace);
+  }
+
+  body.vscode-dark, body.vscode-high-contrast {
     --success: #4ec9b0;
     --success-dark: #2d8a6e;
     --error: #f14c4c;
     --error-dark: #a33;
-    --mono: var(--vscode-editor-font-family, 'SF Mono', 'Fira Code', monospace);
     --orange: #E87A2A;
+    --ticker-bg: rgba(255,255,255,0.03);
+    --grad-success-start: #2d8a6e;
+    --grad-success-end: #4ec9b0;
+    --grad-error-start: #a33;
+    --grad-error-end: #f14c4c;
+    --waterfall-start: rgba(78,201,176,0.05);
+    --waterfall-end: rgba(78,201,176,0.35);
+    --waterfall-stroke: #4ec9b0;
+  }
+
+  body.vscode-light {
+    --success: #16825d;
+    --success-dark: #0e5c42;
+    --error: #cd3131;
+    --error-dark: #a02020;
+    --orange: #c05621;
+    --ticker-bg: rgba(0,0,0,0.03);
+    --grad-success-start: #0e5c42;
+    --grad-success-end: #16825d;
+    --grad-error-start: #a02020;
+    --grad-error-end: #cd3131;
+    --waterfall-start: rgba(22,130,93,0.05);
+    --waterfall-end: rgba(22,130,93,0.3);
+    --waterfall-stroke: #16825d;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -257,86 +330,72 @@ function buildTraceHtml(
   .header h1 { font-size: 1.4em; font-weight: 600; }
   .header .subtitle { color: var(--fg-dim); font-size: 0.9em; margin-top: 4px; }
 
-  /* Stats */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 14px;
-    margin-bottom: 32px;
-  }
-
-  .stat-card {
-    background: var(--card-bg);
+  /* ── Terminal Ticker ───────────── */
+  .ticker {
+    background: var(--ticker-bg);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px 20px;
-    position: relative;
-    overflow: hidden;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    font-family: var(--mono);
+    font-size: 13px;
   }
-
-  .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    border-radius: 10px 10px 0 0;
+  .ticker-line {
+    line-height: 2.4;
+    white-space: pre;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
-
-  .stat-card.duration::before { background: var(--accent); }
-  .stat-card.responses::before { background: var(--success); }
-  .stat-card.tokens::before { background: var(--orange); }
-  .stat-card.throughput::before { background: var(--fg-dim); }
-
-  .stat-label {
-    font-size: 0.68em;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+  .tk-label {
     color: var(--fg-dim);
-    margin-bottom: 6px;
+    display: inline-block;
+    width: 14ch;
+    flex-shrink: 0;
+  }
+  .tk-fill { color: var(--success); }
+  .tk-fill.error { color: var(--error); }
+  .tk-empty { color: var(--border); opacity: 0.5; }
+  .tk-val {
+    color: var(--fg);
+    font-weight: 600;
+    margin-left: 4px;
+    min-width: 8ch;
+    text-align: right;
+  }
+  .tk-dim { color: var(--fg-dim); font-size: 0.9em; }
+
+  .section-label {
+    font-size: 0.68em; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--fg-dim);
+    margin-bottom: 10px;
   }
 
-  .stat-value {
-    font-size: 1.8em;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.1;
-  }
-
-  .stat-sub {
-    font-size: 0.72em;
-    color: var(--fg-dim);
-    margin-top: 8px;
-  }
-
-  .donut {
-    width: 36px; height: 36px; border-radius: 50%;
-    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-  }
-  .donut-hole {
-    width: 20px; height: 20px; border-radius: 50%;
-    background: var(--card-bg);
-    position: absolute; top: 8px; left: 8px;
-  }
-
-  .success-ring {
-    width: 36px; height: 36px; border-radius: 50%;
-    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-  }
-  .success-ring-hole {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--card-bg);
-    position: absolute; top: 7px; left: 7px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.55em; font-weight: 700; color: var(--success);
-  }
-
+  /* ── Duration Breakdown (mini bar) */
   .duration-breakdown {
     display: flex; height: 4px; border-radius: 2px;
-    overflow: hidden; margin-top: 10px; gap: 1px;
+    overflow: hidden; margin: 8px 0 0 0; gap: 1px;
   }
   .duration-seg { height: 100%; border-radius: 1px; min-width: 2px; }
 
-  /* Timeline */
+  /* ── Pulse Meter ───────────────── */
+  .pulse-section { margin-bottom: 24px; }
+  .pulse-svg { width: 100%; height: auto; }
+  .pulse-line {
+    animation: pulse-draw 2s ease-out forwards;
+    stroke-dasharray: 1200;
+    stroke-dashoffset: 1200;
+  }
+  @keyframes pulse-draw {
+    to { stroke-dashoffset: 0; }
+  }
+  .pulse-legend {
+    display: flex; gap: 20px; margin-top: 6px;
+    font-size: 0.65em; color: var(--fg-dim); font-family: var(--mono);
+    justify-content: space-between;
+  }
+
+  /* ── Timeline ──────────────────── */
   #chart-container { width: 100%; margin-bottom: 8px; }
   #chart-container svg { display: block; width: 100%; }
 
@@ -375,7 +434,7 @@ function buildTraceHtml(
     fill: var(--fg-dim);
   }
 
-  /* Detail cards (HTML below SVG) */
+  /* ── Detail cards ──────────────── */
   .detail-cards-container { margin-left: 0; }
 
   .detail-card {
@@ -433,7 +492,7 @@ function buildTraceHtml(
   .token-split-in { background: var(--accent); height: 100%; }
   .token-split-out { background: var(--orange); height: 100%; }
 
-  /* Waterfall */
+  /* ── Waterfall ─────────────────── */
   .waterfall-section { margin-bottom: 28px; }
   .waterfall-title {
     font-size: 0.75em; text-transform: uppercase;
@@ -446,13 +505,13 @@ function buildTraceHtml(
     margin-top: 4px; font-size: 0.65em; color: var(--fg-dim); font-family: var(--mono);
   }
 
-  /* Tooltip */
+  /* ── Tooltip ───────────────────── */
   .tooltip {
     display: none; position: fixed;
     background: var(--card-bg); border: 1px solid var(--border);
     border-radius: 8px; padding: 14px 18px; font-size: 0.85em;
     pointer-events: none; z-index: 100;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.15);
     min-width: 240px; max-width: 400px;
   }
   .tooltip .tt-title { font-weight: 600; margin-bottom: 8px; font-size: 1.05em; }
@@ -470,40 +529,50 @@ function buildTraceHtml(
     <div class="subtitle">${bars.length} responses &middot; ${fmtMs(totalMs)} total</div>
   </div>
 
-  <div class="stats">
-    <div class="stat-card duration">
-      <div class="stat-label">Duration</div>
-      <div class="stat-value">${fmtMs(totalMs)}</div>
-      <div class="duration-breakdown" id="dur-breakdown"></div>
+  <!-- Terminal Ticker -->
+  <div class="ticker">
+    <div class="ticker-line">
+      <span class="tk-label">duration</span>
+      ${tickerBar(totalMs, totalMs, barWidth)}
+      <span class="tk-val">${fmtMs(totalMs)}</span>
     </div>
-    <div class="stat-card responses">
-      <div class="stat-label">Responses</div>
-      <div class="stat-value">${bars.length}</div>
-      <div class="stat-sub">${successCount} success &middot; ${bars.length - successCount} error</div>
-      <div class="success-ring" style="background: conic-gradient(var(--success) ${Math.round((successCount / bars.length) * 360)}deg, var(--border) 0deg);">
-        <div class="success-ring-hole">${Math.round((successCount / bars.length) * 100)}%</div>
-      </div>
+    <div class="ticker-line">
+      <span class="tk-label">responses</span>
+      ${tickerBar(successCount, bars.length, barWidth)}
+      <span class="tk-val">${bars.length}</span>
+      <span class="tk-dim">${successCount} ok${errorCount > 0 ? ` &middot; <span style="color:var(--error)">${errorCount} err</span>` : ""}</span>
     </div>
-    <div class="stat-card tokens">
-      <div class="stat-label">Tokens</div>
-      <div class="stat-value">${totalTokens.toLocaleString()}</div>
-      <div class="stat-sub">${totalTokensIn.toLocaleString()} in &middot; ${totalTokensOut.toLocaleString()} out</div>
-      <div class="donut" style="background: conic-gradient(var(--accent) ${tokenInPct * 3.6}deg, var(--orange) 0deg);">
-        <div class="donut-hole"></div>
-      </div>
+    <div class="ticker-line">
+      <span class="tk-label">tokens</span>
+      ${tickerBar(totalTokensIn, totalTokens, barWidth)}
+      <span class="tk-val">${totalTokens.toLocaleString()}</span>
+      <span class="tk-dim">${fmtTokensShort(totalTokensIn)} in &middot; ${fmtTokensShort(totalTokensOut)} out</span>
     </div>
-    <div class="stat-card throughput">
-      <div class="stat-label">Throughput</div>
-      <div class="stat-value">${throughput.toLocaleString()}</div>
-      <div class="stat-sub">tokens / second</div>
+    <div class="ticker-line">
+      <span class="tk-label">throughput</span>
+      ${tickerBar(throughput, throughput, barWidth)}
+      <span class="tk-val">${throughput.toLocaleString()}</span>
+      <span class="tk-dim">tokens/sec</span>
+    </div>
+    <div class="duration-breakdown" id="dur-breakdown"></div>
+  </div>
+
+  <!-- Pulse Meter -->
+  <div class="pulse-section">
+    <div class="section-label">Token Consumption</div>
+    ${buildPulseSvg(bars, totalMs, totalTokens)}
+    <div class="pulse-legend">
+      <span>0</span>
+      <span>${totalTokens.toLocaleString()} tokens</span>
     </div>
   </div>
 
+  <div class="section-label">Request Timeline</div>
   <div id="chart-container"></div>
   <div class="detail-cards-container" id="detail-cards"></div>
 
   <div class="waterfall-section">
-    <div class="waterfall-title">Token Consumption</div>
+    <div class="waterfall-title">Cumulative Tokens</div>
     <div id="waterfall-container"></div>
     <div class="waterfall-label">
       <span>0</span>
@@ -519,6 +588,20 @@ function buildTraceHtml(
     const data = ${dataJson};
     const totalMs = ${totalMs};
     const totalTokens = ${totalTokens};
+
+    // Read CSS custom properties for D3
+    const cs = getComputedStyle(document.body);
+    const gradSuccessStart = cs.getPropertyValue('--grad-success-start').trim();
+    const gradSuccessEnd = cs.getPropertyValue('--grad-success-end').trim();
+    const gradErrorStart = cs.getPropertyValue('--grad-error-start').trim();
+    const gradErrorEnd = cs.getPropertyValue('--grad-error-end').trim();
+    const wfStart = cs.getPropertyValue('--waterfall-start').trim();
+    const wfEnd = cs.getPropertyValue('--waterfall-end').trim();
+    const wfStroke = cs.getPropertyValue('--waterfall-stroke').trim();
+    const borderColor = cs.getPropertyValue('--border').trim() || '#333';
+    const fgDim = cs.getPropertyValue('--fg-dim').trim() || '#888';
+    const successColor = cs.getPropertyValue('--success').trim();
+    const errorColor = cs.getPropertyValue('--error').trim();
 
     function fmtMs(ms) {
       return ms < 1000 ? Math.round(ms) + 'ms' : (ms / 1000).toFixed(1) + 's';
@@ -538,7 +621,6 @@ function buildTraceHtml(
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    // Compute row layout: each bar + its thinking rows
     const ROW_H = 36;
     const THINK_H = 22;
     const rows = [];
@@ -555,7 +637,7 @@ function buildTraceHtml(
     const chartContainer = document.getElementById('chart-container');
     const detailCards = document.getElementById('detail-cards');
 
-    // Create detail cards (HTML)
+    // Detail cards
     data.forEach((bar, idx) => {
       const card = document.createElement('div');
       card.className = 'detail-card';
@@ -598,14 +680,14 @@ function buildTraceHtml(
       detailCards.appendChild(card);
     });
 
-    // Duration breakdown in stats
+    // Duration breakdown
     const durBreakdown = document.getElementById('dur-breakdown');
-    const colors = ['var(--success)', 'var(--accent)', 'var(--orange)', '#a78bfa', '#f472b6'];
+    const colors = [successColor, 'var(--accent)', 'var(--orange)', '#a78bfa', '#f472b6'];
     data.forEach((bar, i) => {
       const seg = document.createElement('div');
       seg.className = 'duration-seg';
       seg.style.flex = bar.duration_ms;
-      seg.style.background = bar.has_error ? 'var(--error)' : colors[i % colors.length];
+      seg.style.background = bar.has_error ? errorColor : colors[i % colors.length];
       seg.title = '@' + bar.response_id + ': ' + fmtMs(bar.duration_ms);
       durBreakdown.appendChild(seg);
     });
@@ -628,37 +710,32 @@ function buildTraceHtml(
       const width = containerWidth - margin.left - margin.right;
       const height = totalHeight;
 
-      // X scale: time
       const x = d3.scaleLinear().domain([0, totalMs]).range([0, width]);
 
-      // SVG
       const svg = d3.select(chartContainer)
         .append('svg')
         .attr('width', containerWidth)
         .attr('height', height + margin.top + margin.bottom);
 
-      // Gradient defs
       const defs = svg.append('defs');
 
       const successGrad = defs.append('linearGradient').attr('id', 'grad-success')
         .attr('x1', '0%').attr('x2', '100%');
-      successGrad.append('stop').attr('offset', '0%').attr('stop-color', '#2d8a6e');
-      successGrad.append('stop').attr('offset', '100%').attr('stop-color', '#4ec9b0');
+      successGrad.append('stop').attr('offset', '0%').attr('stop-color', gradSuccessStart);
+      successGrad.append('stop').attr('offset', '100%').attr('stop-color', gradSuccessEnd);
 
       const errorGrad = defs.append('linearGradient').attr('id', 'grad-error')
         .attr('x1', '0%').attr('x2', '100%');
-      errorGrad.append('stop').attr('offset', '0%').attr('stop-color', '#a33');
-      errorGrad.append('stop').attr('offset', '100%').attr('stop-color', '#f14c4c');
+      errorGrad.append('stop').attr('offset', '0%').attr('stop-color', gradErrorStart);
+      errorGrad.append('stop').attr('offset', '100%').attr('stop-color', gradErrorEnd);
 
-      // Waterfall area gradient
       const wfGrad = defs.append('linearGradient').attr('id', 'grad-waterfall')
         .attr('x1', '0%').attr('y1', '100%').attr('x2', '0%').attr('y2', '0%');
-      wfGrad.append('stop').attr('offset', '0%').attr('stop-color', '#4ec9b0').attr('stop-opacity', 0.05);
-      wfGrad.append('stop').attr('offset', '100%').attr('stop-color', '#4ec9b0').attr('stop-opacity', 0.35);
+      wfGrad.append('stop').attr('offset', '0%').attr('stop-color', wfStart);
+      wfGrad.append('stop').attr('offset', '100%').attr('stop-color', wfEnd);
 
       const g = svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
-      // Gridlines
       const ticks = x.ticks(6);
       g.selectAll('.grid-line')
         .data(ticks)
@@ -670,14 +747,12 @@ function buildTraceHtml(
         .attr('y1', 0)
         .attr('y2', height);
 
-      // Render rows
       let yPos = 0;
       rows.forEach(row => {
         if (row.type === 'bar') {
           const bar = row.bar;
           const rowG = g.append('g').attr('transform', 'translate(0,' + yPos + ')');
 
-          // Row background (hover)
           rowG.append('rect')
             .attr('x', -margin.left)
             .attr('width', containerWidth)
@@ -706,13 +781,11 @@ function buildTraceHtml(
             })
             .on('mouseout', () => { tooltip.style.display = 'none'; });
 
-          // Row separator
           rowG.append('line')
             .attr('x1', -margin.left).attr('x2', containerWidth - margin.left)
             .attr('y1', ROW_H).attr('y2', ROW_H)
-            .attr('stroke', 'var(--border)').attr('stroke-opacity', 0.15);
+            .attr('stroke', borderColor).attr('stroke-opacity', 0.15);
 
-          // Label: @rid
           rowG.append('text')
             .attr('class', 'label-text')
             .attr('x', -margin.left + 12)
@@ -721,7 +794,6 @@ function buildTraceHtml(
             .attr('text-anchor', 'start')
             .text('@' + bar.response_id);
 
-          // Label: method (truncate by character count, no textLength stretching)
           const methodMaxChars = Math.floor((margin.left - 60) / 7.5);
           const methodLabel = bar.method.length > methodMaxChars
             ? bar.method.slice(0, methodMaxChars) + '\u2026'
@@ -734,14 +806,12 @@ function buildTraceHtml(
             .attr('text-anchor', 'start')
             .text(methodLabel);
 
-          // Bar rect
           const bh = barHeight(bar.tokens_total);
           const bx = x(bar.start_offset_ms);
           const bw = Math.max(x(bar.start_offset_ms + bar.duration_ms) - bx, 6);
           const by = (ROW_H - bh) / 2;
 
           if (bar.tool_calls.length > 1) {
-            // Segmented bar for batch calls
             const segW = bw / bar.tool_calls.length;
             bar.tool_calls.forEach((tc, si) => {
               rowG.append('rect')
@@ -754,7 +824,6 @@ function buildTraceHtml(
                 .attr('fill', bar.has_error ? 'url(#grad-error)' : 'url(#grad-success)')
                 .attr('opacity', 0.7 + (si % 2) * 0.3);
             });
-            // Round right end of last segment
             if (bar.tool_calls.length > 0) {
               const lastSeg = rowG.selectAll('rect').filter((_, i, nodes) => i === nodes.length - 1);
               lastSeg.attr('rx', 4).attr('ry', 4);
@@ -770,7 +839,6 @@ function buildTraceHtml(
               .attr('fill', bar.has_error ? 'url(#grad-error)' : 'url(#grad-success)');
           }
 
-          // Meta label after bar
           const metaX = bx + bw + 6;
           if (metaX + 80 < width) {
             rowG.append('text')
@@ -784,26 +852,22 @@ function buildTraceHtml(
           yPos += ROW_H;
 
         } else {
-          // Thinking row
           const t = row.think;
           const tG = g.append('g').attr('transform', 'translate(0,' + yPos + ')');
 
-          // Separator
           tG.append('line')
             .attr('x1', -margin.left).attr('x2', containerWidth - margin.left)
             .attr('y1', THINK_H).attr('y2', THINK_H)
-            .attr('stroke', 'var(--border)').attr('stroke-opacity', 0.08);
+            .attr('stroke', borderColor).attr('stroke-opacity', 0.08);
 
           let tx = 4;
-          // Icon
           tG.append('text')
             .attr('class', 'think-text think-icon-text')
             .attr('x', tx).attr('y', THINK_H / 2)
             .attr('dominant-baseline', 'central')
-            .text(t.kind === 'read' ? '\\u25C7' : '\\u25B7');
+            .text(t.kind === 'read' ? '\u25C7' : '\u25B7');
           tx += 16;
 
-          // @ref
           tG.append('text')
             .attr('class', 'think-text')
             .attr('x', tx).attr('y', THINK_H / 2)
@@ -811,7 +875,6 @@ function buildTraceHtml(
             .text('@' + t.source_response);
           tx += 30;
 
-          // Query
           const queryDisplay = t.query.length > 30 ? t.query.slice(0, 30) + '...' : t.query;
           tG.append('text')
             .attr('class', 'think-text')
@@ -821,7 +884,6 @@ function buildTraceHtml(
             .text(queryDisplay);
           tx += Math.min(queryDisplay.length * 6.5, width * 0.4) + 10;
 
-          // Tokens
           if (t.result_tokens > 0) {
             tG.append('text')
               .attr('class', 'think-text')
@@ -831,7 +893,6 @@ function buildTraceHtml(
             tx += 60;
           }
 
-          // Saved
           if (t.source_tokens > 0 && t.result_tokens > 0) {
             const saved = t.source_tokens - t.result_tokens;
             if (saved > 0) {
@@ -844,7 +905,6 @@ function buildTraceHtml(
             }
           }
 
-          // Variable
           if (t.variable_name) {
             tG.append('text')
               .attr('class', 'think-text think-var-text')
@@ -854,13 +914,12 @@ function buildTraceHtml(
             tx += 60;
           }
 
-          // Kind label
           tG.append('text')
             .attr('class', 'think-text')
             .attr('x', tx).attr('y', THINK_H / 2)
             .attr('dominant-baseline', 'central')
             .attr('opacity', 0.35)
-            .text('\\u3008' + t.kind + '\\u3009');
+            .text('\u3008' + t.kind + '\u3009');
 
           yPos += THINK_H;
         }
@@ -875,10 +934,10 @@ function buildTraceHtml(
         .tickPadding(6);
       axisG.call(xAxis);
       axisG.selectAll('text').attr('class', 'axis-text');
-      axisG.select('.domain').attr('stroke', 'var(--border)').attr('stroke-opacity', 0.5);
-      axisG.selectAll('.tick line').attr('stroke', 'var(--border)').attr('stroke-opacity', 0.3);
+      axisG.select('.domain').attr('stroke', borderColor).attr('stroke-opacity', 0.5);
+      axisG.selectAll('.tick line').attr('stroke', borderColor).attr('stroke-opacity', 0.3);
 
-      // Token waterfall (D3 area chart)
+      // Waterfall
       const wfContainer = document.getElementById('waterfall-container');
       const wfHeight = 60;
       const wfSvg = d3.select(wfContainer)
@@ -888,7 +947,6 @@ function buildTraceHtml(
 
       const wfG = wfSvg.append('g').attr('transform', 'translate(' + margin.left + ',4)');
 
-      // Build waterfall data points
       const wfData = [{ x: 0, y: 0 }];
       let cumulative = 0;
       data.forEach(bar => {
@@ -911,35 +969,24 @@ function buildTraceHtml(
         .attr('d', areaGen)
         .attr('fill', 'url(#grad-waterfall)');
 
-      // Waterfall stroke line
-      const lineGen = d3.area()
-        .x(d => x(d.x))
-        .y0(d => yWf(d.y))
-        .y1(d => yWf(d.y))
-        .curve(d3.curveMonotoneX);
-
       wfG.append('path')
         .datum(wfData)
         .attr('d', d3.area().x(d => x(d.x)).y0(d => yWf(d.y)).y1(d => yWf(d.y)).curve(d3.curveMonotoneX))
         .attr('fill', 'none')
-        .attr('stroke', '#4ec9b0')
+        .attr('stroke', wfStroke)
         .attr('stroke-width', 1.5)
         .attr('stroke-opacity', 0.6);
 
-      // Border rect
       wfG.append('rect')
         .attr('x', 0).attr('y', 0)
         .attr('width', width).attr('height', wfHeight)
         .attr('fill', 'none')
-        .attr('stroke', 'var(--border)')
+        .attr('stroke', borderColor)
         .attr('stroke-opacity', 0.3)
         .attr('rx', 6);
     }
 
-    // Initial render
     render();
-
-    // Resize observer
     const ro = new ResizeObserver(() => render());
     ro.observe(chartContainer);
   </script>

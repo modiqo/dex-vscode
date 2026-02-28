@@ -151,7 +151,7 @@ function buildPlanData(
     }
   }
 
-  // Value-based inference (QueryRead → HttpRequest)
+  // Value-based inference
   const responseBodyCache = new Map<number, string>();
   function getResponseBody(rid: number): string {
     if (responseBodyCache.has(rid)) { return responseBodyCache.get(rid)!; }
@@ -240,7 +240,6 @@ function buildPlanData(
       wastedMs: e.durations.slice(1).reduce((s, d) => s + d, 0),
     }));
 
-  // Build edges
   const edges: Array<{ from: number; to: number }> = [];
   const nodeIdSet = new Set(nodes.map(n => n.responseId));
   for (const node of nodes) {
@@ -299,252 +298,49 @@ function topoSortLevels(nodes: PlanNode[], nodeMap: Map<number, PlanNode>): Exec
   return levels;
 }
 
-// ── Pure HTML/CSS rendering (no D3) ──────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────
 
-function buildPlanHtml(wsName: string, plan: PlanData): string {
-  const savingsPct = plan.totalSequentialMs > 0
-    ? Math.round(((plan.totalSequentialMs - plan.totalParallelMs) / plan.totalSequentialMs) * 100)
-    : 0;
-  const speedupDeg = Math.min(savingsPct * 3.6, 360);
-
-  // Build DAG SVG server-side
-  const dagSvg = buildDagSvg(plan);
-
-  // Build level cards HTML
-  const levelCardsHtml = plan.levels.map(level => {
-    const isParallel = level.nodes.length > 1;
-    const badgeClass = isParallel ? "badge-parallel" : "badge-sequential";
-    const badgeText = isParallel ? `${level.nodes.length} parallel` : "sequential";
-
-    const rows = level.nodes.map(n =>
-      `<div class="level-row">
-        <span class="level-rid">@${n.responseId}</span>
-        <span class="level-tool">${esc(n.toolName)}</span>
-        <span class="level-dur">${fmtMs(n.durationMs)}</span>
-      </div>`
-    ).join("");
-
-    const maxLine = isParallel
-      ? `<div class="level-max">max duration: ${fmtMs(level.maxDurationMs)} (determines level time)</div>`
-      : "";
-
-    return `<div class="level-card open">
-      <div class="level-header">
-        <span class="level-label">Level ${level.level}</span>
-        <span class="level-badge ${badgeClass}">${badgeText}</span>
-      </div>
-      <div class="level-body">${rows}${maxLine}</div>
-    </div>`;
-  }).join("");
-
-  // Build warning cards HTML
-  const warningsHtml = plan.duplicates.length > 0
-    ? `<div class="warnings-section">
-        <div class="section-title warnings-title">Performance Warnings</div>
-        ${plan.duplicates.map(dup =>
-          `<div class="warning-card">
-            <div class="warning-label">Redundant: ${esc(dup.toolName)}</div>
-            <div class="warning-detail">${dup.count} identical calls &middot; ${fmtMs(dup.wastedMs)} wasted</div>
-          </div>`
-        ).join("")}
-      </div>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  :root {
-    --fg: var(--vscode-foreground);
-    --fg-dim: var(--vscode-descriptionForeground);
-    --bg: var(--vscode-editor-background);
-    --border: var(--vscode-widget-border, #333);
-    --accent: var(--vscode-textLink-foreground);
-    --card-bg: var(--vscode-editorWidget-background, var(--bg));
-    --success: #4ec9b0;
-    --error: #f14c4c;
-    --orange: #E87A2A;
-    --mono: var(--vscode-editor-font-family, 'SF Mono', 'Fira Code', monospace);
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-    color: var(--fg);
-    background: var(--bg);
-    padding: 24px 32px;
-    line-height: 1.5;
-  }
-
-  .header { margin-bottom: 28px; }
-  .header h1 { font-size: 1.4em; font-weight: 600; }
-  .header .subtitle { color: var(--fg-dim); font-size: 0.9em; margin-top: 4px; }
-
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-bottom: 32px;
-  }
-
-  .stat-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px 20px;
-    position: relative;
-    overflow: hidden;
-  }
-  .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    border-radius: 10px 10px 0 0;
-  }
-  .stat-card.actual::before { background: var(--fg-dim); }
-  .stat-card.potential::before { background: var(--success); }
-  .stat-card.speedup::before { background: linear-gradient(90deg, var(--success), var(--accent)); }
-
-  .stat-label {
-    font-size: 0.68em; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--fg-dim); margin-bottom: 6px;
-  }
-  .stat-value {
-    font-size: 1.8em; font-weight: 700;
-    font-variant-numeric: tabular-nums; line-height: 1.1;
-  }
-  .stat-sub { font-size: 0.72em; color: var(--fg-dim); margin-top: 8px; }
-
-  .success-ring {
-    width: 36px; height: 36px; border-radius: 50%;
-    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-  }
-  .success-ring-hole {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--card-bg);
-    position: absolute; top: 7px; left: 7px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.55em; font-weight: 700; color: var(--success);
-  }
-
-  .section-title {
-    font-size: 0.75em; text-transform: uppercase;
-    letter-spacing: 0.08em; color: var(--fg-dim); margin-bottom: 12px;
-  }
-
-  /* DAG */
-  .dag-section { margin-bottom: 32px; }
-  .dag-container { width: 100%; overflow-x: auto; }
-  .dag-container svg { display: block; }
-
-  /* Levels */
-  .levels-section { margin-bottom: 32px; }
-
-  .level-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin-bottom: 8px;
-  }
-  .level-header {
-    display: flex; justify-content: space-between;
-    align-items: center; cursor: pointer;
-  }
-  .level-label { font-weight: 600; font-size: 0.9em; }
-  .level-badge {
-    font-size: 0.72em; padding: 2px 8px;
-    border-radius: 4px; font-weight: 500;
-  }
-  .badge-parallel { background: rgba(78,201,176,0.15); color: var(--success); }
-  .badge-sequential { background: rgba(128,128,128,0.15); color: var(--fg-dim); }
-
-  .level-body { margin-top: 8px; }
-  .level-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 6px 0; font-size: 0.82em;
-    border-bottom: 1px solid rgba(128,128,128,0.12);
-  }
-  .level-row:last-child { border-bottom: none; }
-  .level-rid {
-    font-family: var(--mono); font-size: 0.85em;
-    color: var(--fg-dim); flex-shrink: 0; width: 36px;
-  }
-  .level-tool { flex: 1; font-weight: 500; }
-  .level-dur {
-    font-family: var(--mono); font-size: 0.85em;
-    color: var(--fg-dim); flex-shrink: 0;
-  }
-  .level-max {
-    font-size: 0.72em; color: var(--fg-dim);
-    margin-top: 6px; font-style: italic;
-  }
-
-  /* Warnings */
-  .warnings-section { margin-bottom: 32px; }
-  .warnings-title { color: var(--orange) !important; }
-  .warning-card {
-    background: rgba(232,122,42,0.06);
-    border: 1px solid rgba(232,122,42,0.25);
-    border-radius: 8px; padding: 12px 16px;
-    margin-bottom: 6px; font-size: 0.85em;
-  }
-  .warning-label { color: var(--orange); font-weight: 500; }
-  .warning-detail { color: var(--fg-dim); margin-top: 4px; }
-
-  footer { margin-top: 24px; font-size: 0.72em; color: var(--fg-dim); }
-</style>
-</head>
-<body>
-  <div class="header">
-    <h1>${esc(wsName)}</h1>
-    <div class="subtitle">${plan.levels.length} execution levels &middot; ${plan.nodes.length} responses</div>
-  </div>
-
-  <div class="stats">
-    <div class="stat-card actual">
-      <div class="stat-label">Actual Time</div>
-      <div class="stat-value">${fmtMs(plan.totalSequentialMs)}</div>
-      <div class="stat-sub">sequential execution</div>
-    </div>
-    <div class="stat-card potential">
-      <div class="stat-label">Potential Time</div>
-      <div class="stat-value">${fmtMs(plan.totalParallelMs)}</div>
-      <div class="stat-sub">with parallelization</div>
-    </div>
-    <div class="stat-card speedup">
-      <div class="stat-label">Speedup</div>
-      <div class="stat-value">${plan.speedup.toFixed(1)}x</div>
-      <div class="stat-sub">${savingsPct}% faster</div>
-      <div class="success-ring" style="background: conic-gradient(var(--success) ${speedupDeg}deg, var(--border) 0deg);">
-        <div class="success-ring-hole">${savingsPct}%</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="dag-section">
-    <div class="section-title">Execution Plan DAG</div>
-    <div class="dag-container">${dagSvg}</div>
-  </div>
-
-  <div class="levels-section">
-    <div class="section-title">Execution Levels</div>
-    ${levelCardsHtml}
-  </div>
-
-  ${warningsHtml}
-
-  <footer>modiqo &middot; dex plan</footer>
-</body>
-</html>`;
+function tickerBar(value: number, max: number, width: number): string {
+  const filled = max > 0 ? Math.round((value / max) * width) : 0;
+  const empty = width - filled;
+  return `<span class="tk-fill">${"\u2588".repeat(filled)}</span><span class="tk-empty">${"\u2591".repeat(empty)}</span>`;
 }
 
-// ── Server-side SVG generation (no D3 needed) ───────────────────
+// ── Orbital Ring SVG ─────────────────────────────────────────────
+
+function buildOrbitalSvg(speedup: number, savingsPct: number): string {
+  const cx = 90, cy = 90;
+
+  // Three rings: outer=sequential, middle=parallel, inner=speedup
+  function arcPath(r: number, fraction: number): string {
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + Math.PI * 2 * Math.min(fraction, 0.9999);
+    const largeArc = fraction > 0.5 ? 1 : 0;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    return `M${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2}`;
+  }
+
+  return `<svg viewBox="0 0 180 180" class="orbital-svg" xmlns="http://www.w3.org/2000/svg">
+    <!-- Track rings -->
+    <circle cx="${cx}" cy="${cy}" r="76" class="orbital-track"/>
+    <circle cx="${cx}" cy="${cy}" r="62" class="orbital-track"/>
+    <circle cx="${cx}" cy="${cy}" r="48" class="orbital-track"/>
+
+    <!-- Filled arcs (CSS animation draws them) -->
+    <path d="${arcPath(76, 1)}" class="orbital-arc orbital-arc-outer"/>
+    <path d="${arcPath(62, savingsPct > 0 ? 1 - savingsPct / 100 : 1)}" class="orbital-arc orbital-arc-middle"/>
+    <path d="${arcPath(48, Math.min(savingsPct / 100, 1))}" class="orbital-arc orbital-arc-inner"/>
+
+    <!-- Center label -->
+    <text x="${cx}" y="${cy - 4}" text-anchor="middle" class="orbital-value">${speedup.toFixed(1)}x</text>
+    <text x="${cx}" y="${cy + 12}" text-anchor="middle" class="orbital-label">speedup</text>
+  </svg>`;
+}
+
+// ── DAG SVG (theme-adaptive using CSS vars in style attrs) ───────
 
 function buildDagSvg(plan: PlanData): string {
   const { levels, edges } = plan;
@@ -557,7 +353,6 @@ function buildDagSvg(plan: PlanData): string {
   const padX = 30;
   const padY = 24;
 
-  // Compute positions
   const positions = new Map<number, { x: number; y: number; node: PlanNode }>();
   const maxNodesInLevel = Math.max(...levels.map(l => l.nodes.length));
   const maxHeight = maxNodesInLevel * (nodeH + nodeGap) - nodeGap;
@@ -581,23 +376,11 @@ function buildDagSvg(plan: PlanData): string {
 
   let svg = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">`;
 
-  // Defs
+  // Defs — using style attributes for theme-adaptive colors
   svg += `<defs>
-    <linearGradient id="gs" x1="0%" x2="100%">
-      <stop offset="0%" stop-color="#2d8a6e"/>
-      <stop offset="100%" stop-color="#4ec9b0"/>
-    </linearGradient>
-    <linearGradient id="ga" x1="0%" x2="100%">
-      <stop offset="0%" stop-color="#1a6fa0"/>
-      <stop offset="100%" stop-color="#3794d1"/>
-    </linearGradient>
-    <linearGradient id="ge" x1="0%" x2="100%">
-      <stop offset="0%" stop-color="#aa3333"/>
-      <stop offset="100%" stop-color="#f14c4c"/>
-    </linearGradient>
     <marker id="ah" viewBox="0 0 10 7" refX="10" refY="3.5"
       markerWidth="8" markerHeight="6" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#888"/>
+      <polygon points="0 0, 10 3.5, 0 7" style="fill: var(--edge-color)"/>
     </marker>
   </defs>`;
 
@@ -605,9 +388,9 @@ function buildDagSvg(plan: PlanData): string {
   levels.forEach((level, li) => {
     const lx = padX + li * (nodeW + levelGap) - 10;
     if (li % 2 === 0) {
-      svg += `<rect x="${lx}" y="4" width="${nodeW + 20}" height="${svgH - 8}" rx="8" fill="rgba(128,128,128,0.06)"/>`;
+      svg += `<rect x="${lx}" y="4" width="${nodeW + 20}" height="${svgH - 8}" rx="8" style="fill: var(--level-band)"/>`;
     }
-    svg += `<text x="${lx + (nodeW + 20) / 2}" y="${svgH - 6}" text-anchor="middle" font-size="10" fill="#888" opacity="0.5">L${li}</text>`;
+    svg += `<text x="${lx + (nodeW + 20) / 2}" y="${svgH - 6}" text-anchor="middle" font-size="10" style="fill: var(--fg-dim)" opacity="0.5">L${li}</text>`;
   });
 
   // Edges
@@ -622,28 +405,362 @@ function buildDagSvg(plan: PlanData): string {
     const y2 = to.y + nodeH / 2;
     const cx = (x1 + x2) / 2;
 
-    svg += `<path d="M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}" fill="none" stroke="#888" stroke-opacity="0.4" stroke-width="1.5" marker-end="url(#ah)"/>`;
+    svg += `<path d="M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}" style="fill: none; stroke: var(--edge-color); stroke-opacity: 0.4; stroke-width: 1.5" marker-end="url(#ah)"/>`;
   }
 
   // Nodes
   positions.forEach((pos) => {
     const n = pos.node;
-    const fill = n.hasError ? "url(#ge)" : (n.dependencies.length === 0 ? "url(#gs)" : "url(#ga)");
-    const stroke = n.hasError ? `stroke="#f14c4c" stroke-width="2"` : "";
+    const nodeClass = n.hasError ? "dag-node-error" : (n.dependencies.length === 0 ? "dag-node-independent" : "dag-node-dependent");
 
     svg += `<g transform="translate(${pos.x},${pos.y})">`;
-    svg += `<rect width="${nodeW}" height="${nodeH}" rx="8" ry="8" fill="${fill}" opacity="0.85" ${stroke}/>`;
-    svg += `<text x="12" y="20" font-size="11" font-weight="700" fill="#fff" opacity="0.9">@${n.responseId}</text>`;
+    svg += `<rect width="${nodeW}" height="${nodeH}" rx="8" ry="8" class="${nodeClass}"/>`;
+    svg += `<text x="12" y="20" font-size="11" font-weight="700" class="dag-node-text">@${n.responseId}</text>`;
 
     const maxChars = Math.floor((nodeW - 24) / 7);
     const toolLabel = n.toolName.length > maxChars ? n.toolName.slice(0, maxChars) + "\u2026" : n.toolName;
-    svg += `<text x="12" y="38" font-size="10" fill="#fff" opacity="0.75">${esc(toolLabel)}</text>`;
-    svg += `<text x="${nodeW - 10}" y="20" text-anchor="end" font-size="10" fill="#fff" opacity="0.65">${fmtMs(n.durationMs)}</text>`;
+    svg += `<text x="12" y="38" font-size="10" class="dag-node-text" opacity="0.8">${esc(toolLabel)}</text>`;
+    svg += `<text x="${nodeW - 10}" y="20" text-anchor="end" font-size="10" class="dag-node-text" opacity="0.7">${fmtMs(n.durationMs)}</text>`;
     svg += `</g>`;
   });
 
   svg += `</svg>`;
   return svg;
+}
+
+function buildPlanHtml(wsName: string, plan: PlanData): string {
+  const savingsPct = plan.totalSequentialMs > 0
+    ? Math.round(((plan.totalSequentialMs - plan.totalParallelMs) / plan.totalSequentialMs) * 100)
+    : 0;
+
+  const dagSvg = buildDagSvg(plan);
+  const barWidth = 28;
+
+  // Level cards HTML
+  const levelCardsHtml = plan.levels.map(level => {
+    const isParallel = level.nodes.length > 1;
+    const badgeClass = isParallel ? "badge-parallel" : "badge-sequential";
+    const badgeText = isParallel ? `${level.nodes.length} parallel` : "sequential";
+
+    const rows = level.nodes.map(n =>
+      `<div class="level-row">
+        <span class="level-rid">@${n.responseId}</span>
+        <span class="level-tool">${esc(n.toolName)}</span>
+        <span class="level-dur">${fmtMs(n.durationMs)}</span>
+      </div>`
+    ).join("");
+
+    const maxLine = isParallel
+      ? `<div class="level-max">max duration: ${fmtMs(level.maxDurationMs)} (determines level time)</div>`
+      : "";
+
+    return `<div class="level-card">
+      <div class="level-header">
+        <span class="level-label">Level ${level.level}</span>
+        <span class="level-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="level-body">${rows}${maxLine}</div>
+    </div>`;
+  }).join("");
+
+  // Warning cards
+  const warningsHtml = plan.duplicates.length > 0
+    ? `<div class="warnings-section">
+        <div class="section-label warnings-title">Performance Warnings</div>
+        ${plan.duplicates.map(dup =>
+          `<div class="warning-card">
+            <div class="warning-label">Redundant: ${esc(dup.toolName)}</div>
+            <div class="warning-detail">${dup.count} identical calls &middot; ${fmtMs(dup.wastedMs)} wasted</div>
+          </div>`
+        ).join("")}
+      </div>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --fg: var(--vscode-foreground);
+    --fg-dim: var(--vscode-descriptionForeground);
+    --bg: var(--vscode-editor-background);
+    --border: var(--vscode-widget-border, #333);
+    --accent: var(--vscode-textLink-foreground);
+    --card-bg: var(--vscode-editorWidget-background, var(--bg));
+    --mono: var(--vscode-editor-font-family, 'SF Mono', 'Fira Code', monospace);
+  }
+
+  body.vscode-dark, body.vscode-high-contrast {
+    --success: #4ec9b0;
+    --error: #f14c4c;
+    --orange: #E87A2A;
+    --ticker-bg: rgba(255,255,255,0.03);
+    --level-band: rgba(128,128,128,0.06);
+    --edge-color: #888;
+    --node-independent-bg: #1a6b52;
+    --node-dependent-bg: #1a5a8a;
+    --node-error-bg: #8a2020;
+    --node-text: #fff;
+    --orbital-track: rgba(128,128,128,0.15);
+    --orbital-outer: #666;
+    --orbital-middle: var(--accent);
+    --orbital-inner: #4ec9b0;
+  }
+
+  body.vscode-light {
+    --success: #16825d;
+    --error: #cd3131;
+    --orange: #c05621;
+    --ticker-bg: rgba(0,0,0,0.03);
+    --level-band: rgba(0,0,0,0.04);
+    --edge-color: #999;
+    --node-independent-bg: #16825d;
+    --node-dependent-bg: #2a7ab5;
+    --node-error-bg: #cd3131;
+    --node-text: #fff;
+    --orbital-track: rgba(0,0,0,0.08);
+    --orbital-outer: #999;
+    --orbital-middle: var(--accent);
+    --orbital-inner: #16825d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--fg);
+    background: var(--bg);
+    padding: 24px 32px;
+    line-height: 1.5;
+  }
+
+  .header { margin-bottom: 28px; }
+  .header h1 { font-size: 1.4em; font-weight: 600; }
+  .header .subtitle { color: var(--fg-dim); font-size: 0.9em; margin-top: 4px; }
+
+  /* ── Terminal Ticker ───────────── */
+  .ticker {
+    background: var(--ticker-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .ticker-line {
+    line-height: 2.4;
+    white-space: pre;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tk-label {
+    color: var(--fg-dim);
+    display: inline-block;
+    width: 14ch;
+    flex-shrink: 0;
+  }
+  .tk-fill { color: var(--success); }
+  .tk-empty { color: var(--border); opacity: 0.5; }
+  .tk-val {
+    color: var(--fg);
+    font-weight: 600;
+    margin-left: 4px;
+    min-width: 8ch;
+    text-align: right;
+  }
+  .tk-dim { color: var(--fg-dim); font-size: 0.9em; }
+
+  .section-label {
+    font-size: 0.68em; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--fg-dim);
+    margin-bottom: 10px;
+  }
+
+  /* ── Ticker + Orbital layout ───── */
+  .top-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 28px;
+    align-items: start;
+    margin-bottom: 28px;
+  }
+
+  /* ── Orbital Ring ──────────────── */
+  .orbital-container { text-align: center; }
+  .orbital-svg { width: 160px; height: 160px; }
+  .orbital-track {
+    fill: none;
+    stroke: var(--orbital-track);
+    stroke-width: 8;
+  }
+  .orbital-arc {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: orbital-draw 1.2s ease-out forwards;
+  }
+  .orbital-arc-outer { stroke: var(--orbital-outer); opacity: 0.5; }
+  .orbital-arc-middle { stroke: var(--orbital-middle); }
+  .orbital-arc-inner { stroke: var(--orbital-inner); }
+  @keyframes orbital-draw {
+    to { stroke-dashoffset: 0; }
+  }
+  .orbital-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    fill: var(--fg);
+  }
+  .orbital-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    fill: var(--fg-dim);
+  }
+  .orbital-caption {
+    font-size: 0.68em; color: var(--fg-dim);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-top: 6px;
+  }
+
+  /* ── DAG ────────────────────────── */
+  .dag-section { margin-bottom: 32px; }
+  .dag-container { width: 100%; overflow-x: auto; }
+  .dag-container svg { display: block; }
+
+  .dag-node-independent {
+    fill: var(--node-independent-bg);
+    opacity: 0.85;
+  }
+  .dag-node-dependent {
+    fill: var(--node-dependent-bg);
+    opacity: 0.85;
+  }
+  .dag-node-error {
+    fill: var(--node-error-bg);
+    opacity: 0.85;
+    stroke: var(--error);
+    stroke-width: 2;
+  }
+  .dag-node-text {
+    fill: var(--node-text);
+  }
+
+  /* ── Levels ────────────────────── */
+  .levels-section { margin-bottom: 32px; }
+
+  .level-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+  }
+  .level-header {
+    display: flex; justify-content: space-between;
+    align-items: center;
+  }
+  .level-label { font-weight: 600; font-size: 0.9em; }
+  .level-badge {
+    font-size: 0.72em; padding: 2px 8px;
+    border-radius: 4px; font-weight: 500;
+  }
+  .badge-parallel { background: color-mix(in srgb, var(--success) 15%, transparent); color: var(--success); }
+  .badge-sequential { background: color-mix(in srgb, var(--fg-dim) 15%, transparent); color: var(--fg-dim); }
+
+  .level-body { margin-top: 8px; }
+  .level-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; font-size: 0.82em;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  }
+  .level-row:last-child { border-bottom: none; }
+  .level-rid {
+    font-family: var(--mono); font-size: 0.85em;
+    color: var(--fg-dim); flex-shrink: 0; width: 36px;
+  }
+  .level-tool { flex: 1; font-weight: 500; }
+  .level-dur {
+    font-family: var(--mono); font-size: 0.85em;
+    color: var(--fg-dim); flex-shrink: 0;
+  }
+  .level-max {
+    font-size: 0.72em; color: var(--fg-dim);
+    margin-top: 6px; font-style: italic;
+  }
+
+  /* ── Warnings ──────────────────── */
+  .warnings-section { margin-bottom: 32px; }
+  .warnings-title { color: var(--orange) !important; }
+  .warning-card {
+    background: color-mix(in srgb, var(--orange) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--orange) 25%, transparent);
+    border-radius: 8px; padding: 12px 16px;
+    margin-bottom: 6px; font-size: 0.85em;
+  }
+  .warning-label { color: var(--orange); font-weight: 500; }
+  .warning-detail { color: var(--fg-dim); margin-top: 4px; }
+
+  footer { margin-top: 24px; font-size: 0.72em; color: var(--fg-dim); }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>${esc(wsName)}</h1>
+    <div class="subtitle">${plan.levels.length} execution levels &middot; ${plan.nodes.length} responses</div>
+  </div>
+
+  <!-- Ticker + Orbital Ring -->
+  <div class="top-row">
+    <div class="ticker">
+      <div class="ticker-line">
+        <span class="tk-label">actual time</span>
+        ${tickerBar(plan.totalSequentialMs, plan.totalSequentialMs, barWidth)}
+        <span class="tk-val">${fmtMs(plan.totalSequentialMs)}</span>
+        <span class="tk-dim">sequential</span>
+      </div>
+      <div class="ticker-line">
+        <span class="tk-label">parallel time</span>
+        ${tickerBar(plan.totalParallelMs, plan.totalSequentialMs, barWidth)}
+        <span class="tk-val">${fmtMs(plan.totalParallelMs)}</span>
+        <span class="tk-dim">with parallelization</span>
+      </div>
+      <div class="ticker-line">
+        <span class="tk-label">speedup</span>
+        ${tickerBar(savingsPct, 100, barWidth)}
+        <span class="tk-val">${plan.speedup.toFixed(1)}x</span>
+        <span class="tk-dim">${savingsPct}% faster</span>
+      </div>
+    </div>
+    <div class="orbital-container">
+      ${buildOrbitalSvg(plan.speedup, savingsPct)}
+      <div class="orbital-caption">${savingsPct}% savings</div>
+    </div>
+  </div>
+
+  <div class="dag-section">
+    <div class="section-label">Execution Plan DAG</div>
+    <div class="dag-container">${dagSvg}</div>
+  </div>
+
+  <div class="levels-section">
+    <div class="section-label">Execution Levels</div>
+    ${levelCardsHtml}
+  </div>
+
+  ${warningsHtml}
+
+  <footer>modiqo &middot; dex plan</footer>
+</body>
+</html>`;
 }
 
 function esc(s: string): string {

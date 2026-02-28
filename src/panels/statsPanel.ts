@@ -98,13 +98,107 @@ function buildStatsData(
   };
 }
 
+// ── Terminal ticker bar builders ─────────────────────────────────
+
+function tickerBar(value: number, max: number, width: number): string {
+  const filled = max > 0 ? Math.round((value / max) * width) : 0;
+  const empty = width - filled;
+  return `<span class="tk-fill">${"\u2588".repeat(filled)}</span><span class="tk-empty">${"\u2591".repeat(empty)}</span>`;
+}
+
+// ── Token River SVG (uses CSS vars via style attributes) ─────────
+
+function buildRiverSvg(sourceTokens: number, resultTokens: number, reductionPct: number): string {
+  // The river tapers from source (wide) to result (narrower)
+  // Even 1% reduction shows visually
+  const taperAmount = Math.max(reductionPct * 0.4, 2); // min 2px visible taper
+  const topIn = 15;
+  const botIn = 85;
+  const topOut = topIn + taperAmount;
+  const botOut = botIn - taperAmount;
+
+  return `<svg viewBox="0 0 600 100" class="river-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="river-outer" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" style="stop-color: var(--river-outer-start)"/>
+        <stop offset="100%" style="stop-color: var(--river-outer-end)"/>
+      </linearGradient>
+      <linearGradient id="river-core" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" style="stop-color: var(--success)"/>
+        <stop offset="100%" style="stop-color: var(--success-soft)"/>
+      </linearGradient>
+    </defs>
+    <!-- Outer flow (full response) -->
+    <path d="M0,${topIn} C200,${topIn} 400,${topOut} 600,${topOut}
+             L600,${botOut} C400,${botOut} 200,${botIn} 0,${botIn} Z"
+          style="fill: url(#river-outer); opacity: 0.35"/>
+    <!-- Inner core (extracted) -->
+    <path d="M0,${topIn + 2} C200,${topIn + 2} 400,${topOut + 1} 600,${topOut + 1}
+             L600,${botOut - 1} C400,${botOut - 1} 200,${botIn - 2} 0,${botIn - 2} Z"
+          style="fill: url(#river-core); opacity: 0.7"/>
+    <!-- Flow lines (animated dashes) -->
+    <path d="M0,50 C200,50 400,50 600,50" class="river-flow"
+          style="fill: none; stroke: var(--success); stroke-width: 1; stroke-dasharray: 8 12; stroke-opacity: 0.5"/>
+    <!-- Labels -->
+    <text x="8" y="55" class="river-label river-label-in">${fmtTokensShort(sourceTokens)} in</text>
+    <text x="592" y="55" text-anchor="end" class="river-label river-label-out">${fmtTokensShort(resultTokens)} out</text>
+    ${reductionPct > 0 ? `<text x="300" y="16" text-anchor="middle" class="river-label river-label-delta">-${reductionPct}%</text>` : ""}
+  </svg>`;
+}
+
+// ── Waffle Grid builder ──────────────────────────────────────────
+
+function buildWaffleHtml(reductionPct: number): string {
+  const savedCells = Math.max(Math.round(reductionPct), reductionPct > 0 ? 1 : 0);
+  const extractedCells = 100 - savedCells;
+  let cells = "";
+  for (let i = 0; i < extractedCells; i++) {
+    cells += `<div class="waffle-cell extracted"></div>`;
+  }
+  for (let i = 0; i < savedCells; i++) {
+    cells += `<div class="waffle-cell saved"></div>`;
+  }
+  return cells;
+}
+
+// ── Compression Rune SVG ─────────────────────────────────────────
+
+function buildRuneSvg(queryCount: number, reductionPct: number): string {
+  // Generate a unique glyph: vertices = queries * 2 + 2, shape based on reduction
+  const vertices = Math.max(queryCount * 2 + 2, 4);
+  const outerR = 72;
+  const innerR = outerR * (1 - reductionPct / 100);
+  const cx = 90, cy = 90;
+
+  function polygon(r: number, n: number, offset: number): string {
+    const pts: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const angle = (Math.PI * 2 * i) / n - Math.PI / 2 + offset;
+      pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
+    }
+    return pts.join(" ");
+  }
+
+  return `<svg viewBox="0 0 180 180" class="rune-svg" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="rune-glow">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <polygon points="${polygon(outerR, vertices, 0)}" class="rune-outer"/>
+    <polygon points="${polygon(innerR, vertices, 0.05)}" class="rune-inner" filter="url(#rune-glow)"/>
+    <circle cx="${cx}" cy="${cy}" r="4" style="fill: var(--success)"/>
+    <text x="${cx}" y="${cy + 1}" text-anchor="middle" dominant-baseline="central" class="rune-center">${queryCount}</text>
+  </svg>`;
+}
+
 function buildStatsHtml(wsName: string, stats: StatsData): string {
   const isFlow = stats.executionMode === "flow";
   const modeLabel = isFlow ? "flow execution" : "interactive";
   const processedLabel = isFlow ? "processed" : "cached";
   const queriesJson = JSON.stringify(stats.queries);
 
-  // Context window analysis (interactive mode)
   const contextWindow = 200000;
   const fullPct = stats.totalSourceTokens > 0
     ? ((stats.totalSourceTokens / contextWindow) * 100).toFixed(1)
@@ -112,16 +206,14 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
   const resultPct = stats.totalResultTokens > 0
     ? ((stats.totalResultTokens / contextWindow) * 100).toFixed(1)
     : "0";
-
-  // Cost estimate (Sonnet 4.5: $3/M input)
   const costSaved = ((stats.reduction / 1_000_000) * 3).toFixed(2);
-
-  const successPct = stats.queries.length > 0 ? 100 : 0;
-  const extractedRatio = stats.totalSourceTokens > 0
-    ? Math.round((stats.totalResultTokens / stats.totalSourceTokens) * 100)
-    : 0;
-
   const showContextImpact = !isFlow && stats.reductionPct > 5;
+
+  const maxTokenVal = Math.max(stats.totalSourceTokens, stats.totalResultTokens, 1);
+  const barWidth = 32;
+
+  const readCount = stats.queries.filter(q => q.kind === "read").length;
+  const extractCount = stats.queries.filter(q => q.kind === "extract").length;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -136,301 +228,269 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
     --border: var(--vscode-widget-border, #333);
     --accent: var(--vscode-textLink-foreground);
     --card-bg: var(--vscode-editorWidget-background, var(--bg));
+    --mono: var(--vscode-editor-font-family, 'SF Mono', 'Fira Code', monospace);
+  }
+
+  /* Theme-adaptive custom colors */
+  body.vscode-dark, body.vscode-high-contrast {
     --success: #4ec9b0;
-    --success-dark: #2d8a6e;
+    --success-soft: rgba(78,201,176,0.5);
     --error: #f14c4c;
     --orange: #E87A2A;
-    --mono: var(--vscode-editor-font-family, 'SF Mono', 'Fira Code', monospace);
+    --river-outer-start: rgba(232,122,42,0.4);
+    --river-outer-end: rgba(232,122,42,0.15);
+    --waffle-ext: rgba(78,201,176,0.55);
+    --waffle-saved: var(--accent);
+    --waffle-saved-glow: rgba(78,130,220,0.6);
+    --rune-outer-stroke: rgba(232,122,42,0.3);
+    --rune-inner-stroke: #4ec9b0;
+    --ticker-bg: rgba(255,255,255,0.03);
+    --context-row-border: rgba(128,128,128,0.15);
+  }
+
+  body.vscode-light {
+    --success: #16825d;
+    --success-soft: rgba(22,130,93,0.35);
+    --error: #cd3131;
+    --orange: #c05621;
+    --river-outer-start: rgba(192,86,33,0.25);
+    --river-outer-end: rgba(192,86,33,0.08);
+    --waffle-ext: rgba(22,130,93,0.45);
+    --waffle-saved: var(--accent);
+    --waffle-saved-glow: rgba(0,90,180,0.4);
+    --rune-outer-stroke: rgba(192,86,33,0.35);
+    --rune-inner-stroke: #16825d;
+    --ticker-bg: rgba(0,0,0,0.03);
+    --context-row-border: rgba(0,0,0,0.08);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
+    font-family: var(--mono);
+    font-size: 13px;
     color: var(--fg);
     background: var(--bg);
     padding: 24px 32px;
     line-height: 1.5;
   }
 
+  /* ── Header ────────────────────── */
   .header { margin-bottom: 28px; }
-  .header h1 { font-size: 1.4em; font-weight: 600; }
-  .header .subtitle { color: var(--fg-dim); font-size: 0.9em; margin-top: 4px; }
-  .header .mode-badge {
-    display: inline-block;
-    font-size: 0.7em;
-    padding: 2px 8px;
-    border-radius: 4px;
-    margin-left: 8px;
-    vertical-align: middle;
+  .header h1 {
+    font-size: 1.3em; font-weight: 600;
+    font-family: var(--vscode-font-family);
+  }
+  .header .subtitle {
+    color: var(--fg-dim); font-size: 0.85em; margin-top: 4px;
+  }
+  .mode-badge {
+    display: inline-block; font-size: 0.7em; padding: 2px 8px;
+    border-radius: 4px; margin-left: 8px; vertical-align: middle;
     background: color-mix(in srgb, var(--accent) 15%, transparent);
-    color: var(--accent);
-    font-weight: 500;
-    letter-spacing: 0.04em;
+    color: var(--accent); font-weight: 500; letter-spacing: 0.04em;
   }
 
-  /* Stat cards */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 14px;
-    margin-bottom: 32px;
-  }
-
-  .stat-card {
-    background: var(--card-bg);
+  /* ── Terminal Ticker ───────────── */
+  .ticker {
+    background: var(--ticker-bg);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 18px 20px;
-    position: relative;
-    overflow: hidden;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    font-family: var(--mono);
+    font-size: 13px;
   }
-
-  .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    border-radius: 10px 10px 0 0;
+  .ticker-line {
+    line-height: 2.4;
+    white-space: pre;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
-
-  .stat-card.queries::before { background: var(--accent); }
-  .stat-card.source::before { background: var(--orange); }
-  .stat-card.result::before { background: var(--success); }
-  .stat-card.reduction::before { background: linear-gradient(90deg, var(--success), var(--accent)); }
-
-  .stat-label {
-    font-size: 0.68em;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+  .tk-label {
     color: var(--fg-dim);
-    margin-bottom: 6px;
+    display: inline-block;
+    width: 14ch;
+    flex-shrink: 0;
+  }
+  .tk-fill { color: var(--success); }
+  .tk-empty { color: var(--border); opacity: 0.5; }
+  .tk-val {
+    color: var(--fg);
+    font-weight: 600;
+    margin-left: 4px;
+    min-width: 8ch;
+    text-align: right;
+  }
+  .tk-dim {
+    color: var(--fg-dim);
+    font-size: 0.9em;
   }
 
-  .stat-value {
-    font-size: 1.8em;
+  /* ── River ─────────────────────── */
+  .river-section { margin-bottom: 28px; }
+  .section-label {
+    font-size: 0.68em; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--fg-dim);
+    margin-bottom: 10px;
+  }
+  .river-svg { width: 100%; height: auto; }
+  .river-label {
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .river-label-in { fill: var(--orange); }
+  .river-label-out { fill: var(--success); }
+  .river-label-delta { fill: var(--fg-dim); font-size: 10px; }
+  .river-flow {
+    animation: flow-dash 3s linear infinite;
+  }
+  @keyframes flow-dash {
+    from { stroke-dashoffset: 40; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* ── Waffle + Rune (side by side) */
+  .viz-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 32px;
+    align-items: start;
+    margin-bottom: 28px;
+  }
+  .waffle-section { flex: 1; }
+  .waffle-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 3px;
+    max-width: 260px;
+  }
+  .waffle-cell {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    transition: opacity 0.2s;
+  }
+  .waffle-cell.extracted {
+    background: var(--waffle-ext);
+  }
+  .waffle-cell.saved {
+    background: var(--waffle-saved);
+    box-shadow: 0 0 8px var(--waffle-saved-glow);
+  }
+  .waffle-cell:hover { opacity: 0.8; }
+  .waffle-legend {
+    display: flex; gap: 16px; margin-top: 10px;
+    font-size: 0.72em; color: var(--fg-dim);
+  }
+  .legend-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 2px; margin-right: 6px; vertical-align: middle;
+  }
+
+  .rune-container { text-align: center; }
+  .rune-svg { width: 140px; height: 140px; }
+  .rune-outer {
+    fill: none;
+    stroke: var(--rune-outer-stroke);
+    stroke-width: 1.5;
+    animation: rune-spin 60s linear infinite;
+    transform-origin: 90px 90px;
+  }
+  .rune-inner {
+    fill: none;
+    stroke: var(--rune-inner-stroke);
+    stroke-width: 2;
+  }
+  .rune-center {
+    font-family: var(--mono);
+    font-size: 14px;
     font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.1;
+    fill: var(--fg);
   }
-
-  .stat-sub {
-    font-size: 0.72em;
-    color: var(--fg-dim);
+  @keyframes rune-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .rune-caption {
+    font-size: 0.68em; color: var(--fg-dim);
+    text-transform: uppercase; letter-spacing: 0.08em;
     margin-top: 8px;
   }
 
-  .success-ring {
-    width: 36px; height: 36px; border-radius: 50%;
-    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-  }
-  .success-ring-hole {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--card-bg);
-    position: absolute; top: 7px; left: 7px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.55em; font-weight: 700; color: var(--success);
-  }
-
-  /* Efficiency bar */
-  .efficiency-section {
-    margin-bottom: 32px;
-  }
-
-  .efficiency-title {
-    font-size: 0.75em;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-dim);
-    margin-bottom: 12px;
-  }
-
-  .efficiency-bar-container {
-    position: relative;
-    height: 40px;
-    background: var(--card-bg);
+  /* ── Context Impact ────────────── */
+  .context-section {
+    background: var(--ticker-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    overflow: hidden;
+    padding: 18px 22px;
+    margin-bottom: 28px;
   }
-
-  .efficiency-bar-full {
-    position: absolute;
-    top: 0; left: 0; bottom: 0;
-    width: 100%;
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
-    display: flex;
-    align-items: center;
-    padding: 0 14px;
-  }
-
-  .efficiency-bar-extracted {
-    position: absolute;
-    top: 0; left: 0; bottom: 0;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--success) 35%, transparent), color-mix(in srgb, var(--success) 20%, transparent));
-    border-right: 2px solid var(--success);
-    display: flex;
-    align-items: center;
-    padding: 0 14px;
-    min-width: 60px;
-  }
-
-  .efficiency-label {
-    font-size: 0.72em;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .efficiency-label.full { color: var(--fg-dim); position: absolute; right: 14px; }
-  .efficiency-label.extracted { color: var(--success); }
-
-  .efficiency-legend {
-    display: flex;
-    gap: 20px;
-    margin-top: 10px;
-    font-size: 0.72em;
-    color: var(--fg-dim);
-  }
-
-  .legend-dot {
-    display: inline-block;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
-
-  /* Context impact */
-  .context-section {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px 24px;
-    margin-bottom: 32px;
-  }
-
-  .context-title {
-    font-size: 0.75em;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-dim);
-    margin-bottom: 14px;
-  }
-
   .context-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 8px 0;
+    border-bottom: 1px solid var(--context-row-border);
+    font-size: 0.85em;
   }
-
   .context-row:last-child { border-bottom: none; }
-
-  .context-label { font-size: 0.85em; color: var(--fg-dim); }
+  .context-label { color: var(--fg-dim); }
   .context-value {
     font-family: var(--mono);
-    font-size: 0.9em;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+    font-weight: 600; font-variant-numeric: tabular-nums;
   }
-
   .context-value.highlight { color: var(--success); }
-
   .cost-savings {
-    margin-top: 14px;
-    padding: 10px 16px;
+    margin-top: 14px; padding: 10px 16px;
     background: color-mix(in srgb, var(--success) 8%, transparent);
     border: 1px solid color-mix(in srgb, var(--success) 20%, transparent);
-    border-radius: 6px;
-    font-size: 0.85em;
-    color: var(--success);
-    font-weight: 500;
+    border-radius: 6px; font-size: 0.85em;
+    color: var(--success); font-weight: 500;
   }
 
-  /* Query breakdown */
-  .breakdown-section { margin-bottom: 32px; }
-
-  .breakdown-title {
-    font-size: 0.75em;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-dim);
-    margin-bottom: 12px;
-  }
-
+  /* ── Query Breakdown ───────────── */
+  .breakdown-section { margin-bottom: 28px; }
   .query-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
-    font-size: 0.82em;
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 12px; font-size: 0.82em;
+    border-bottom: 1px solid var(--context-row-border);
   }
-
   .query-row:last-child { border-bottom: none; }
-
   .query-kind {
-    font-size: 0.75em;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-weight: 500;
-    flex-shrink: 0;
+    font-size: 0.72em; padding: 1px 6px;
+    border-radius: 3px; font-weight: 500; flex-shrink: 0;
   }
-
   .query-kind.read {
     background: color-mix(in srgb, var(--accent) 15%, transparent);
     color: var(--accent);
   }
-
   .query-kind.extract {
     background: color-mix(in srgb, var(--orange) 15%, transparent);
     color: var(--orange);
   }
-
   .query-source {
-    font-family: var(--mono);
-    font-size: 0.9em;
-    color: var(--fg-dim);
-    flex-shrink: 0;
+    font-family: var(--mono); font-size: 0.85em;
+    color: var(--fg-dim); flex-shrink: 0;
   }
-
   .query-text {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--fg);
+    flex: 1; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; color: var(--fg);
   }
-
   .query-tokens {
-    font-family: var(--mono);
-    font-size: 0.85em;
-    color: var(--fg-dim);
-    flex-shrink: 0;
+    font-family: var(--mono); font-size: 0.85em;
+    color: var(--fg-dim); flex-shrink: 0;
   }
-
   .query-saved {
-    font-family: var(--mono);
-    font-size: 0.85em;
-    color: var(--success);
-    font-weight: 500;
-    flex-shrink: 0;
+    font-family: var(--mono); font-size: 0.85em;
+    color: var(--success); font-weight: 500; flex-shrink: 0;
   }
-
   .query-var {
-    font-family: var(--mono);
-    font-size: 0.85em;
-    color: var(--orange);
-    flex-shrink: 0;
+    font-family: var(--mono); font-size: 0.85em;
+    color: var(--orange); flex-shrink: 0;
   }
 
   .note {
-    font-size: 0.78em;
-    color: var(--fg-dim);
-    margin-bottom: 20px;
-    font-style: italic;
+    font-size: 0.78em; color: var(--fg-dim);
+    margin-bottom: 20px; font-style: italic;
   }
 
   footer { margin-top: 24px; font-size: 0.72em; color: var(--fg-dim); }
@@ -445,54 +505,62 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
     </div>
   </div>
 
-  <div class="stats">
-    <div class="stat-card queries">
-      <div class="stat-label">Queries</div>
-      <div class="stat-value">${stats.queries.length}</div>
-      <div class="stat-sub">${stats.queries.filter(q => q.kind === "read").length} read &middot; ${stats.queries.filter(q => q.kind === "extract").length} extract</div>
-      <div class="success-ring" style="background: conic-gradient(var(--success) ${successPct * 3.6}deg, var(--border) 0deg);">
-        <div class="success-ring-hole">${successPct}%</div>
-      </div>
+  <!-- Terminal Ticker -->
+  <div class="ticker">
+    <div class="ticker-line">
+      <span class="tk-label">queries</span>
+      ${tickerBar(stats.queries.length, Math.max(stats.queries.length, 10), barWidth)}
+      <span class="tk-val">${stats.queries.length}</span>
+      <span class="tk-dim">${readCount} read &middot; ${extractCount} extract</span>
     </div>
-    <div class="stat-card source">
-      <div class="stat-label">Response Data</div>
-      <div class="stat-value">${stats.totalSourceTokens.toLocaleString()}</div>
-      <div class="stat-sub">tokens ${processedLabel}</div>
+    <div class="ticker-line">
+      <span class="tk-label">response</span>
+      ${tickerBar(stats.totalSourceTokens, maxTokenVal, barWidth)}
+      <span class="tk-val">${fmtTokensShort(stats.totalSourceTokens)}</span>
+      <span class="tk-dim">tokens ${processedLabel}</span>
     </div>
-    <div class="stat-card result">
-      <div class="stat-label">Results Extracted</div>
-      <div class="stat-value">${stats.totalResultTokens.toLocaleString()}</div>
-      <div class="stat-sub">tokens extracted</div>
+    <div class="ticker-line">
+      <span class="tk-label">extracted</span>
+      ${tickerBar(stats.totalResultTokens, maxTokenVal, barWidth)}
+      <span class="tk-val">${fmtTokensShort(stats.totalResultTokens)}</span>
+      <span class="tk-dim">tokens extracted</span>
     </div>
-    <div class="stat-card reduction">
-      <div class="stat-label">Reduction</div>
-      <div class="stat-value">${stats.reductionPct}%</div>
-      <div class="stat-sub">${stats.reduction.toLocaleString()} tokens saved</div>
-      <div class="success-ring" style="background: conic-gradient(var(--success) ${stats.reductionPct * 3.6}deg, var(--border) 0deg);">
-        <div class="success-ring-hole">${stats.reductionPct}%</div>
-      </div>
+    <div class="ticker-line">
+      <span class="tk-label">reduction</span>
+      ${tickerBar(stats.reductionPct, 100, barWidth)}
+      <span class="tk-val">${stats.reductionPct}%</span>
+      <span class="tk-dim">${stats.reduction.toLocaleString()} saved</span>
     </div>
   </div>
 
-  <div class="efficiency-section">
-    <div class="efficiency-title">Token Efficiency</div>
-    <div class="efficiency-bar-container">
-      <div class="efficiency-bar-full">
-        <span class="efficiency-label full">${stats.totalSourceTokens.toLocaleString()} ${processedLabel}</span>
+  <!-- Token River -->
+  <div class="river-section">
+    <div class="section-label">Token Flow</div>
+    ${buildRiverSvg(stats.totalSourceTokens, stats.totalResultTokens, stats.reductionPct)}
+  </div>
+
+  <!-- Waffle Grid + Compression Rune -->
+  <div class="viz-row">
+    <div class="waffle-section">
+      <div class="section-label">Reduction Map</div>
+      <div class="waffle-grid">
+        ${buildWaffleHtml(stats.reductionPct)}
       </div>
-      <div class="efficiency-bar-extracted" style="width: ${Math.max(extractedRatio, 3)}%">
-        <span class="efficiency-label extracted">${stats.totalResultTokens.toLocaleString()}</span>
+      <div class="waffle-legend">
+        <span><span class="legend-dot" style="background: var(--waffle-ext)"></span>extracted</span>
+        <span><span class="legend-dot" style="background: var(--waffle-saved)"></span>saved</span>
       </div>
     </div>
-    <div class="efficiency-legend">
-      <span><span class="legend-dot" style="background: var(--success)"></span>extracted</span>
-      <span><span class="legend-dot" style="background: color-mix(in srgb, var(--accent) 30%, transparent)"></span>${processedLabel}</span>
+    <div class="rune-container">
+      <div class="section-label">Session Glyph</div>
+      ${buildRuneSvg(stats.queries.length, stats.reductionPct)}
+      <div class="rune-caption">${stats.queries.length} queries &middot; ${stats.reductionPct}% reduced</div>
     </div>
   </div>
 
   ${showContextImpact ? `
   <div class="context-section">
-    <div class="context-title">Context Window Impact</div>
+    <div class="section-label">Context Window Impact</div>
     <div class="context-row">
       <span class="context-label">Full responses</span>
       <span class="context-value">${fullPct}% of 200K context</span>
@@ -508,7 +576,7 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
   ` : ""}
 
   <div class="breakdown-section">
-    <div class="breakdown-title">Query Breakdown</div>
+    <div class="section-label">Query Breakdown</div>
     <div id="query-list"></div>
   </div>
 
@@ -560,4 +628,10 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function fmtTokensShort(n: number): string {
+  if (n >= 1_000_000) { return `${(n / 1_000_000).toFixed(1)}M`; }
+  if (n >= 1_000) { return `${Math.round(n / 1000)}K`; }
+  return n.toString();
 }
