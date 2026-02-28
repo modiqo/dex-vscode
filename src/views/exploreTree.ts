@@ -4,6 +4,7 @@ import type {
   ExploreResult,
   ExploreToolMatch,
   ExploreSkillMatch,
+  FlowSearchMatch,
 } from "../client/dexClient";
 
 type ExploreNodeKind =
@@ -11,6 +12,7 @@ type ExploreNodeKind =
   | "loading"
   | "section"
   | "skill-match"
+  | "flow-search-match"
   | "adapter-group"
   | "tool-match"
   | "empty";
@@ -23,6 +25,7 @@ export class ExploreTreeItem extends vscode.TreeItem {
     public readonly adapterId?: string,
     public readonly toolMatch?: ExploreToolMatch,
     public readonly skillMatch?: ExploreSkillMatch,
+    public readonly flowSearchMatch?: FlowSearchMatch,
     private extUri?: vscode.Uri
   ) {
     super(label, collapsible);
@@ -108,6 +111,32 @@ export class ExploreTreeItem extends vscode.TreeItem {
         }
         break;
 
+      case "flow-search-match":
+        if (this.flowSearchMatch) {
+          const fm = this.flowSearchMatch;
+          this.description = `${fm.matchPercent}%  [${fm.flowType}]`;
+          this.tooltip = new vscode.MarkdownString([
+            `**${fm.name}**  \`${fm.flowType}\``,
+            "",
+            fm.description,
+            "",
+            `| Field | Value |`,
+            `|-------|-------|`,
+            `| Match | ${fm.matchPercent}% |`,
+            `| Adapter | ${fm.adapter} |`,
+            `| Endpoints | ${fm.endpoints} |`,
+            `| Location | ${fm.location} |`,
+          ].join("\n"));
+          this.iconPath = this.extUri
+            ? {
+                light: vscode.Uri.joinPath(this.extUri, "media", "light", "flow.svg"),
+                dark: vscode.Uri.joinPath(this.extUri, "media", "dark", "flow.svg"),
+              }
+            : new vscode.ThemeIcon("zap");
+          this.contextValue = "explore-flow-search";
+        }
+        break;
+
       case "empty":
         this.iconPath = new vscode.ThemeIcon("info");
         this.contextValue = "explore-empty";
@@ -148,7 +177,7 @@ export class ExploreTreeProvider
     try {
       this.cachedResult = await this.client.explore(query);
     } catch {
-      this.cachedResult = { query, tools: [], skills: [] };
+      this.cachedResult = { query, tools: [], skills: [], flowSearchResults: [] };
     }
 
     this.searching = false;
@@ -168,6 +197,21 @@ export class ExploreTreeProvider
 
     if (element.kind === "section") {
       const label = element.label as string;
+      if (label.startsWith("Flow Search") && this.cachedResult) {
+        return this.cachedResult.flowSearchResults.map(
+          (f) =>
+            new ExploreTreeItem(
+              "flow-search-match",
+              vscode.TreeItemCollapsibleState.None,
+              f.name,
+              undefined,
+              undefined,
+              undefined,
+              f,
+              this.extUri
+            )
+        );
+      }
       if (label.startsWith("Flows") && this.cachedResult) {
         return this.cachedResult.skills.map(
           (s) =>
@@ -178,6 +222,7 @@ export class ExploreTreeProvider
               undefined,
               undefined,
               s,
+              undefined,
               this.extUri
             )
         );
@@ -200,6 +245,7 @@ export class ExploreTreeProvider
               t.adapter_id,
               t,
               undefined,
+              undefined,
               this.extUri
             )
         );
@@ -219,6 +265,7 @@ export class ExploreTreeProvider
           undefined,
           undefined,
           undefined,
+          undefined,
           this.extUri
         ),
       ];
@@ -231,6 +278,7 @@ export class ExploreTreeProvider
           "search-prompt",
           vscode.TreeItemCollapsibleState.None,
           "Search adapters & flows...",
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -251,18 +299,36 @@ export class ExploreTreeProvider
       undefined,
       undefined,
       undefined,
+      undefined,
       this.extUri
     );
     searchItem.description = "click to search again";
     items.push(searchItem);
 
-    // Skills section
+    // Flow Search section (richer results from dex flow search)
+    if (result.flowSearchResults.length > 0) {
+      items.push(
+        new ExploreTreeItem(
+          "section",
+          vscode.TreeItemCollapsibleState.Expanded,
+          `Flow Search (${result.flowSearchResults.length})`,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          this.extUri
+        )
+      );
+    }
+
+    // Skills section (from dex explore)
     if (result.skills.length > 0) {
       items.push(
         new ExploreTreeItem(
           "section",
           vscode.TreeItemCollapsibleState.Expanded,
           `Flows (${result.skills.length})`,
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -282,17 +348,21 @@ export class ExploreTreeProvider
           undefined,
           undefined,
           undefined,
+          undefined,
           this.extUri
         )
       );
     }
 
-    if (result.skills.length === 0 && result.tools.length === 0) {
+    const hasAny = result.flowSearchResults.length > 0 ||
+      result.skills.length > 0 || result.tools.length > 0;
+    if (!hasAny) {
       items.push(
         new ExploreTreeItem(
           "empty",
           vscode.TreeItemCollapsibleState.None,
           "No results found",
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -327,6 +397,7 @@ export class ExploreTreeProvider
         vscode.TreeItemCollapsibleState.Collapsed,
         adapterId,
         adapterId,
+        undefined,
         undefined,
         undefined,
         this.extUri

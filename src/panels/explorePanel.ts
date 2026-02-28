@@ -18,6 +18,7 @@ export function showExploreResultsPanel(
 function buildExploreHtml(result: ExploreResult): string {
   const toolsJson = JSON.stringify(result.tools);
   const skillsJson = JSON.stringify(result.skills);
+  const flowSearchJson = JSON.stringify(result.flowSearchResults);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -263,6 +264,86 @@ function buildExploreHtml(result: ExploreResult): string {
     color: var(--accent);
     margin-left: 8px;
   }
+
+  /* Flow search cards */
+  .flow-search-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .flow-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    background: var(--card-bg);
+    transition: border-color 0.15s;
+  }
+
+  .flow-card:hover {
+    border-color: var(--accent);
+  }
+
+  .flow-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+
+  .flow-card-name {
+    font-weight: 600;
+    font-size: 0.92em;
+  }
+
+  .flow-type-tag {
+    font-size: 0.65em;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .flow-type-atomic {
+    background: color-mix(in srgb, var(--success) 15%, transparent);
+    color: var(--success);
+  }
+
+  .flow-type-composite {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+  }
+
+  .flow-card-desc {
+    font-size: 0.82em;
+    color: var(--fg-dim);
+    line-height: 1.5;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .flow-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.75em;
+    color: var(--fg-dim);
+    margin-bottom: 8px;
+  }
+
+  .flow-card-meta .endpoint-ok {
+    color: var(--success);
+  }
+
+  .flow-card-meta .endpoint-err {
+    color: var(--error);
+  }
 </style>
 </head>
 <body>
@@ -276,6 +357,7 @@ function buildExploreHtml(result: ExploreResult): string {
     <span class="query-text">"${escapeHtml(result.query)}"</span>
   </div>
 
+  <div id="flow-search-section"></div>
   <div id="skills-section"></div>
   <div id="adapters-section"></div>
 
@@ -284,6 +366,7 @@ function buildExploreHtml(result: ExploreResult): string {
   <script>
     const tools = ${toolsJson};
     const skills = ${skillsJson};
+    const flowSearchResults = ${flowSearchJson};
 
     function escapeHtml(s) {
       if (!s) return '';
@@ -305,6 +388,34 @@ function buildExploreHtml(result: ExploreResult): string {
 
     function parseMatchPct(s) {
       return parseInt(s, 10) || 0;
+    }
+
+    // ── Flow Search section ──
+    const flowSearchEl = document.getElementById('flow-search-section');
+    if (flowSearchResults.length > 0) {
+      let html = '<div class="section-header"><h2>Flow Search</h2><span class="count">' + flowSearchResults.length + ' flows</span></div>';
+      html += '<div class="flow-search-cards">';
+      flowSearchResults.forEach(f => {
+        const pct = f.matchPercent;
+        const cls = matchClass(String(pct));
+        const typeCls = f.flowType === 'COMPOSITE' ? 'flow-type-composite' : 'flow-type-atomic';
+        const endpointOk = f.endpoints.startsWith('[OK]');
+        html += '<div class="flow-card">';
+        html += '<div class="flow-card-top">';
+        html += '<span><span class="flow-card-name">' + escapeHtml(f.name) + '</span> ';
+        html += '<span class="flow-type-tag ' + typeCls + '">' + escapeHtml(f.flowType) + '</span></span>';
+        html += '<span class="match-badge ' + cls + '">' + pct + '%</span>';
+        html += '</div>';
+        html += '<div class="flow-card-desc">' + escapeHtml(f.description) + '</div>';
+        html += '<div class="flow-card-meta">';
+        if (f.adapter) html += '<span>adapter/' + escapeHtml(f.adapter) + '</span>';
+        html += '<span class="' + (endpointOk ? 'endpoint-ok' : 'endpoint-err') + '">' + escapeHtml(f.endpoints) + '</span>';
+        html += '</div>';
+        html += '<div class="score-bar-container"><div class="score-bar" style="width:' + pct + '%;background:' + scoreColor(pct) + '"></div></div>';
+        html += '</div>';
+      });
+      html += '</div>';
+      flowSearchEl.innerHTML = html;
     }
 
     // ── Skills section ──
@@ -381,8 +492,8 @@ function buildExploreHtml(result: ExploreResult): string {
       adaptersEl.innerHTML = html;
     }
 
-    if (skills.length === 0 && tools.length === 0) {
-      document.getElementById('skills-section').innerHTML = '<div class="empty-state">No results found for this query. Try a different search term.</div>';
+    if (flowSearchResults.length === 0 && skills.length === 0 && tools.length === 0) {
+      document.getElementById('flow-search-section').innerHTML = '<div class="empty-state">No results found for this query. Try a different search term.</div>';
     }
   </script>
 </body>

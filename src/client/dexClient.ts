@@ -84,10 +84,21 @@ export interface ExploreSkillMatch {
   matchPercent: string;
 }
 
+export interface FlowSearchMatch {
+  name: string;
+  description: string;
+  matchPercent: number;
+  flowType: "ATOMIC" | "COMPOSITE" | string;
+  location: string;
+  endpoints: string;
+  adapter: string;
+}
+
 export interface ExploreResult {
   query: string;
   tools: ExploreToolMatch[];
   skills: ExploreSkillMatch[];
+  flowSearchResults: FlowSearchMatch[];
 }
 
 export interface DexInfo {
@@ -326,11 +337,22 @@ export class DexClient {
 
   /** Explore adapters and skills matching a query */
   async explore(query: string): Promise<ExploreResult> {
-    const [toolsResult, skillsResult] = await Promise.all([
+    const [toolsResult, skillsResult, flowSearchResults] = await Promise.all([
       this.exploreJson(query),
       this.exploreSkills(query),
+      this.flowSearch(query),
     ]);
-    return { query, tools: toolsResult, skills: skillsResult };
+    return { query, tools: toolsResult, skills: skillsResult, flowSearchResults };
+  }
+
+  /** Search flows with natural language via dex flow search */
+  async flowSearch(query: string): Promise<FlowSearchMatch[]> {
+    try {
+      const text = await this.execText(["flow", "search", query]);
+      return this.parseFlowSearchOutput(text);
+    } catch {
+      return [];
+    }
   }
 
   /** Run explore with --json for tool matches */
@@ -383,6 +405,82 @@ export class DexClient {
     }
 
     return skills;
+  }
+
+  /** Parse dex flow search output (@@flows section with numbered entries) */
+  private parseFlowSearchOutput(text: string): FlowSearchMatch[] {
+    const flows: FlowSearchMatch[] = [];
+    let inFlows = false;
+
+    const lines = text.split("\n");
+    let i = 0;
+    while (i < lines.length) {
+      const trimmed = lines[i].trim();
+
+      if (trimmed.startsWith("@@flows")) {
+        inFlows = true;
+        i++;
+        continue;
+      }
+      if (inFlows && trimmed.startsWith("@@")) {
+        break; // Hit next section
+      }
+
+      if (!inFlows) { i++; continue; }
+
+      // Match entry header: "1. [ATOMIC] flow-name (75% match)"
+      const headerMatch = trimmed.match(
+        /^\d+\.\s+\[(\w+)\]\s+(.+?)\s+\((\d+)%\s+match\)$/
+      );
+      if (!headerMatch) { i++; continue; }
+
+      const flowType = headerMatch[1];
+      const name = headerMatch[2];
+      const matchPercent = parseInt(headerMatch[3], 10);
+
+      // Collect indented lines following the header
+      const details: string[] = [];
+      i++;
+      while (i < lines.length) {
+        const next = lines[i];
+        // Continuation lines are indented (3+ spaces) and non-empty
+        if (next.match(/^\s{3,}\S/)) {
+          details.push(next.trim());
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      // Parse detail lines
+      let description = "";
+      let location = "";
+      let endpoints = "";
+      let adapter = "";
+      const descParts: string[] = [];
+
+      for (const d of details) {
+        if (d.startsWith("Location:")) {
+          location = d.replace("Location:", "").trim();
+        } else if (d.startsWith("Parameters:")) {
+          // skip
+        } else if (d.startsWith("Endpoints:")) {
+          endpoints = d.replace("Endpoints:", "").trim();
+          // Extract adapter from endpoints like "[OK] adapter/gmail"
+          const adapterMatch = endpoints.match(/adapter\/(\S+)/);
+          if (adapterMatch) { adapter = adapterMatch[1]; }
+        } else if (d.startsWith("Use this if:")) {
+          // skip
+        } else {
+          descParts.push(d);
+        }
+      }
+      description = descParts.join(" ");
+
+      flows.push({ name, description, matchPercent, flowType, location, endpoints, adapter });
+    }
+
+    return flows;
   }
 
   /** Parse @@section-based whoami output */
