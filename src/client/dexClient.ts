@@ -106,6 +106,66 @@ export interface DexInfo {
   folder: string;
 }
 
+export interface DryRunToolset {
+  name: string;
+  tool_count: number;
+  confidence: number;
+  methods: Record<string, number>;
+}
+
+export interface DryRunSchemeAuth {
+  type: string;
+  header_name?: string;
+  key_env?: string;
+  token_env?: string;
+  username_env?: string;
+  password_env?: string;
+  description?: string;
+}
+
+export interface DryRunAuth {
+  type: string;
+  header_name?: string;
+  key_env?: string;
+  token_env?: string;
+  description?: string;
+  /** Per-operation: map of scheme name → auth config */
+  schemes?: Record<string, DryRunSchemeAuth>;
+  /** Per-operation: default scheme for unannotated operations */
+  default_scheme?: string | null;
+  /** Per-operation: OpenAPI security scheme definitions */
+  spec_security_schemes?: Record<string, {
+    scheme_type: string;
+    location?: string;
+    name?: string;
+    http_scheme?: string;
+  }>;
+}
+
+export interface DryRunResult {
+  adapter_id: string;
+  spec_source: string;
+  spec: {
+    title: string;
+    version: string;
+    openapi_version: string;
+    base_url: string;
+    operation_count: number;
+    spec_size_bytes: number;
+  };
+  toolsets: DryRunToolset[];
+  detection_method: string;
+  auth: DryRunAuth;
+  summary: {
+    total_toolsets: number;
+    total_tools: number;
+    get_operations: number;
+    post_operations: number;
+    put_operations: number;
+    delete_operations: number;
+  };
+}
+
 export class DexClient {
   private dexPath: string;
 
@@ -159,6 +219,54 @@ export class DexClient {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
     });
+  }
+
+  /** Create adapter non-interactively via dex adapter new --yes.
+   *  Returns a ChildProcess for streaming stdout/stderr progress.
+   *  Optionally passes --config-json for auth, headers, toolset filter overrides. */
+  adapterCreateStream(
+    id: string,
+    specUrl: string,
+    options?: { baseUrl?: string; group?: string; configJson?: object }
+  ): ChildProcess {
+    const args = ["adapter", "new", id, specUrl, "--yes"];
+    if (options?.baseUrl) {
+      args.push("--base-url", options.baseUrl);
+    }
+    if (options?.group) {
+      args.push("--group", options.group);
+    }
+    if (options?.configJson) {
+      args.push("--config-json", JSON.stringify(options.configJson));
+    }
+    return this.execStream(args);
+  }
+
+  /** Run adapter dry-run to detect spec, toolsets, auth without creating.
+   *  Returns structured JSON from `dex adapter new <id> <spec> --dry-run`.
+   *  Uses extended timeout since large specs may take time to download/parse. */
+  async adapterDryRun(
+    id: string,
+    specUrl: string,
+    options?: { baseUrl?: string }
+  ): Promise<DryRunResult> {
+    const args = ["adapter", "new", id, specUrl, "--dry-run"];
+    if (options?.baseUrl) {
+      args.push("--base-url", options.baseUrl);
+    }
+    try {
+      const { stdout, stderr } = await execFileAsync(this.dexPath, args, {
+        timeout: 300000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env },
+      });
+      const out = stdout.trim();
+      const text = out.length > 0 ? out : stderr.trim();
+      return JSON.parse(text) as DryRunResult;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`dry-run failed: ${msg}`);
+    }
   }
 
   /** Execute silently, return success/failure */

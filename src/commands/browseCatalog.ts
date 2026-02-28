@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
 import { DexClient } from "../client/dexClient";
+import { showAdapterWizardPanel } from "../panels/adapterWizardPanel";
 
 export function registerBrowseCatalog(
   client: DexClient,
-  extensionUri: vscode.Uri
+  extensionUri: vscode.Uri,
+  onAdapterCreated?: () => void
 ): vscode.Disposable {
   return vscode.commands.registerCommand(
     "modiqo.browseCatalog",
@@ -53,7 +55,7 @@ export function registerBrowseCatalog(
             try {
               const info = await client.catalogInfo(picked.label);
               const parsed = parseCatalogInfo(info);
-              showCatalogDetailPanel(extensionUri, picked.label, parsed);
+              showCatalogDetailPanel(extensionUri, client, picked.label, parsed, onAdapterCreated);
             } catch {
               vscode.window.showInformationMessage(
                 `Install with: dex adapter new ${picked.label}`
@@ -131,8 +133,10 @@ function parseCatalogInfo(text: string): CatalogInfo {
 
 function showCatalogDetailPanel(
   extensionUri: vscode.Uri,
+  client: DexClient,
   adapterId: string,
-  info: CatalogInfo
+  info: CatalogInfo,
+  onAdapterCreated?: () => void
 ): void {
   const panel = vscode.window.createWebviewPanel(
     "modiqo.catalogDetail",
@@ -142,6 +146,19 @@ function showCatalogDetailPanel(
   );
 
   panel.webview.html = buildDetailHtml(adapterId, info);
+
+  panel.webview.onDidReceiveMessage((msg) => {
+    if (msg.type === "install") {
+      panel.dispose();
+      showAdapterWizardPanel(
+        extensionUri,
+        client,
+        adapterId,
+        info,
+        onAdapterCreated || (() => {})
+      );
+    }
+  });
 }
 
 function buildDetailHtml(adapterId: string, info: CatalogInfo): string {
@@ -280,16 +297,31 @@ function buildDetailHtml(adapterId: string, info: CatalogInfo): string {
 
   .install-section {
     margin-top: 28px;
-    padding: 16px 20px;
-    border: 1px dashed var(--border);
-    border-radius: 6px;
-    font-family: var(--vscode-editor-font-family);
-    font-size: 0.9em;
+    display: flex;
+    gap: 12px;
+    align-items: center;
   }
 
-  .install-section .cmd {
-    color: var(--accent);
+  .install-btn {
+    padding: 8px 20px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 4px;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
     font-weight: 500;
+    cursor: pointer;
+  }
+
+  .install-btn:hover {
+    background: var(--vscode-button-hoverBackground);
+  }
+
+  .install-cli {
+    font-family: var(--vscode-editor-font-family);
+    font-size: 0.85em;
+    color: var(--fg-dim);
   }
 
   .notes {
@@ -343,8 +375,11 @@ function buildDetailHtml(adapterId: string, info: CatalogInfo): string {
   </div>
 
   <div class="install-section">
-    <span class="cmd">dex adapter new ${escapeHtml(adapterId)}</span>
+    <button class="install-btn" onclick="vscode.postMessage({type:'install'})">Install Adapter</button>
+    <span class="install-cli">or run: dex adapter new ${escapeHtml(adapterId)}</span>
   </div>
+
+  <script>const vscode = acquireVsCodeApi();</script>
 
   ${notes ? `<div class="notes">${escapeHtml(notes)}</div>` : ""}
 </body>

@@ -9,6 +9,7 @@ import { registerConfigureToken } from "./commands/configureToken";
 import { registerVerifyAdapter } from "./commands/verifyAdapter";
 import { registerRunFlow } from "./commands/runFlow";
 import { registerBrowseCatalog } from "./commands/browseCatalog";
+import { showAdapterWizardPanel } from "./panels/adapterWizardPanel";
 import { showTracePanel } from "./panels/tracePanel";
 import { showCommandsPanel } from "./panels/commandsPanel";
 import { RegistryTreeProvider } from "./views/registryTree";
@@ -240,7 +241,25 @@ export function activate(context: vscode.ExtensionContext): void {
     registerConfigureToken(client),
     registerVerifyAdapter(client),
     registerRunFlow(client),
-    registerBrowseCatalog(client, context.extensionUri),
+    registerBrowseCatalog(client, context.extensionUri, () => {
+      adapterTree.refresh();
+      statusBar.refresh();
+    }),
+    vscode.commands.registerCommand(
+      "modiqo.createAdapter",
+      (adapterId: string, catalogInfo: Record<string, string>) => {
+        showAdapterWizardPanel(
+          context.extensionUri,
+          client,
+          adapterId,
+          catalogInfo,
+          () => {
+            adapterTree.refresh();
+            statusBar.refresh();
+          }
+        );
+      }
+    ),
     vscode.commands.registerCommand("modiqo.showReference", (args: string[]) => {
       showReferencePanel(client, args);
     })

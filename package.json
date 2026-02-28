@@ -92,6 +92,11 @@
         "category": "modiqo"
       },
       {
+        "command": "modiqo.createAdapter",
+        "title": "Create Adapter from Catalog",
+        "category": "modiqo"
+      },
+      {
         "command": "modiqo.runFlow",
         "title": "Run Flow",
         "category": "modiqo"
