@@ -464,7 +464,7 @@ function buildExploreHtml(result: ExploreResult): string {
         const group = adapterTools[0].group || '';
 
         html += '<div class="adapter-group">';
-        html += '<div class="adapter-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">';
+        html += '<div class="adapter-header" onclick="this.parentElement.classList.toggle(&quot;collapsed&quot;)">';
         html += '<span><span class="adapter-name">' + escapeHtml(adapterId) + '</span>';
         if (group) html += '<span class="group-tag">' + escapeHtml(group) + '</span>';
         html += '</span>';

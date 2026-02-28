@@ -51,7 +51,7 @@ function buildHtml(title: string, content: string): string {
     )
     // Command examples: lines starting with "  dex:" or "  dex "
     .replace(
-      /^(  dex: .+)$/gm,
+      /^( {2}dex: .+)$/gm,
       '<span class="cmd">$1</span>'
     )
     // Code blocks: ```...```

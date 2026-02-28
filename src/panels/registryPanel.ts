@@ -354,9 +354,9 @@ function buildOverviewHtml(
         if (name.startsWith(prefix)) return true;
       }
       // Check multi-adapter fields (comma separated)
-      const parts = adaptersField.split(/[,;]\s*/);
+      const parts = adaptersField.split(/[,;]\\s*/);
       for (const part of parts) {
-        const clean = part.replace(/[\u2026.]+$/, '').trim();
+        const clean = part.replace(/[\\u2026.]+$/, '').trim();
         if (clean && name.startsWith(clean)) return true;
         if (name === clean) return true;
       }
@@ -417,7 +417,7 @@ function buildOverviewHtml(
     // ── Skill cards ──────────────────────────────────────────────
     const skillCards = document.getElementById('skill-cards');
     skills.forEach(s => {
-      const adapterNames = (s.adapters || '').split(/[,;]\s*/).filter(Boolean);
+      const adapterNames = (s.adapters || '').split(/[,;]\\s*/).filter(Boolean);
       const tags = adapterNames.map(n => '<span class="adapter-tag">' + escapeHtml(n) + '</span>').join('');
 
       const card = document.createElement('div');

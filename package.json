@@ -124,6 +124,16 @@
         "category": "modiqo"
       },
       {
+        "command": "modiqo.showStats",
+        "title": "Show Stats",
+        "category": "modiqo"
+      },
+      {
+        "command": "modiqo.showPlan",
+        "title": "Show Execution Plan",
+        "category": "modiqo"
+      },
+      {
         "command": "modiqo.refreshRegistry",
         "title": "Refresh Registry",
         "category": "modiqo",
@@ -234,6 +244,14 @@
           "when": "view == modiqo-workspaces && viewItem =~ /^workspace/"
         },
         {
+          "command": "modiqo.showStats",
+          "when": "view == modiqo-workspaces && viewItem =~ /^workspace/"
+        },
+        {
+          "command": "modiqo.showPlan",
+          "when": "view == modiqo-workspaces && viewItem =~ /^workspace/"
+        },
+        {
           "command": "modiqo.registryLogin",
           "when": "view == modiqo-registry && viewItem == registry-login"
         }
@@ -259,6 +277,7 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/mocha": "^10.0.0",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
@@ -267,6 +286,7 @@
     "esbuild": "^0.24.0",
     "eslint": "^9.0.0",
     "mocha": "^10.0.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.56.1"
   }
 }

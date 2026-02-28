@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { DexClient, DryRunResult } from "../client/dexClient";
+import type { DexClient } from "../client/dexClient";
 
 interface CatalogInfo {
   [key: string]: string;
@@ -98,11 +98,13 @@ async function handleCreate(
   const lines: string[] = [];
 
   const processLine = (line: string) => {
+    /* eslint-disable no-control-regex */
     const clean = line
-      .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+      .replace(/\u001b\[[0-9;]*[a-zA-Z]/g, "")
       .replace(/[\u280B\u2819\u2839\u2838\u283C\u2834\u2826\u2827\u2807\u280F\u2714\u2713]/g, "")
       .replace(/\[K/g, "")
       .trim();
+    /* eslint-enable no-control-regex */
     if (clean.length > 0 && !lines.includes(clean)) {
       lines.push(clean);
       panel.webview.postMessage({ type: "progress", message: clean });
@@ -149,7 +151,8 @@ function parseCreationResult(
   let specType = "";
 
   for (const line of output.split("\n")) {
-    const clean = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").trim();
+    // eslint-disable-next-line no-control-regex
+    const clean = line.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, "").trim();
     const filesMatch = clean.match(/(\d+)\s+toolsets?,\s+(\d+)\s+tools/);
     if (filesMatch) { toolsets = filesMatch[1]; tools = filesMatch[2]; }
     const parsedMatch = clean.match(/Parsed\s+.+?\s+(\d+)\s+operations/);
@@ -164,7 +167,8 @@ function parseCreationResult(
 
 function extractError(output: string): string {
   for (const line of output.split("\n").reverse()) {
-    const clean = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").trim();
+    // eslint-disable-next-line no-control-regex
+    const clean = line.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, "").trim();
     if (clean.startsWith("Error:") || clean.startsWith("error:")) { return clean; }
     if (clean.includes("already exists")) {
       return "Adapter already exists. Remove it first with: dex adapter remove";

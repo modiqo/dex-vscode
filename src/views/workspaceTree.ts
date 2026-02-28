@@ -64,6 +64,20 @@ export class WorkspaceTreeItem extends vscode.TreeItem {
             title: "Show Commands",
             arguments: [this.ws],
           };
+        } else if ((this.label as string) === "Stats") {
+          this.iconPath = new vscode.ThemeIcon("graph");
+          this.command = {
+            command: "modiqo.showStats",
+            title: "Show Stats",
+            arguments: [this.ws],
+          };
+        } else if ((this.label as string) === "Plan") {
+          this.iconPath = new vscode.ThemeIcon("type-hierarchy");
+          this.command = {
+            command: "modiqo.showPlan",
+            title: "Show Plan",
+            arguments: [this.ws],
+          };
         }
         break;
 
@@ -140,6 +154,18 @@ export class WorkspaceTreeProvider
       children.push(new WorkspaceTreeItem(
         ws, "section", vscode.TreeItemCollapsibleState.None,
         "Commands", undefined, this.extUri
+      ));
+
+      // Stats section
+      children.push(new WorkspaceTreeItem(
+        ws, "section", vscode.TreeItemCollapsibleState.None,
+        "Stats", undefined, this.extUri
+      ));
+
+      // Plan section
+      children.push(new WorkspaceTreeItem(
+        ws, "section", vscode.TreeItemCollapsibleState.None,
+        "Plan", undefined, this.extUri
       ));
 
       // Individual responses

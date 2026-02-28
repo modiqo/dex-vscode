@@ -12,6 +12,8 @@ import { registerBrowseCatalog } from "./commands/browseCatalog";
 import { showAdapterWizardPanel } from "./panels/adapterWizardPanel";
 import { showTracePanel } from "./panels/tracePanel";
 import { showCommandsPanel } from "./panels/commandsPanel";
+import { showStatsPanel } from "./panels/statsPanel";
+import { showPlanPanel } from "./panels/planPanel";
 import { RegistryTreeProvider } from "./views/registryTree";
 import {
   showRegistryDetailPanel,
@@ -89,6 +91,12 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("modiqo.showCommands", (ws) => {
       showCommandsPanel(context.extensionUri, ws);
+    }),
+    vscode.commands.registerCommand("modiqo.showStats", (ws) => {
+      showStatsPanel(context.extensionUri, ws);
+    }),
+    vscode.commands.registerCommand("modiqo.showPlan", (ws) => {
+      showPlanPanel(context.extensionUri, ws);
     }),
     vscode.commands.registerCommand("modiqo.refreshRegistry", () => {
       registryTree.refresh();
