@@ -457,7 +457,7 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="goToAuth()">Next: Authentication</button>
+      <button class="btn btn-primary" id="review-next-btn" onclick="goToAuth()">Next: Authentication</button>
       <button class="btn btn-secondary" onclick="doCancel()">Cancel</button>
     </div>
   </div>
@@ -558,7 +558,7 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
     <div id="toolset-selection-summary" style="margin-bottom:14px;font-size:0.86em;color:var(--fg-dim)"></div>
 
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goToAuth()">Back</button>
+      <button class="btn btn-secondary" onclick="goBackFromToolsets()">Back</button>
       <button class="btn btn-primary" onclick="goToConfigure()">Next: Configure</button>
     </div>
   </div>
@@ -687,6 +687,8 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
           authHtml += '<div class="row"><div class="label">Default</div><div class="value"><strong>' + escHtml(data.auth.default_scheme) + '</strong> (for unannotated operations)</div></div>';
         }
         authEl.innerHTML = authHtml;
+      } else if (authType === 'none') {
+        authEl.innerHTML = '<div class="row"><div class="label">Type</div><div class="value"><span class="auth-type-label">none</span> &mdash; public API, no authentication required</div></div>';
       } else {
         let authHtml = '<div class="row"><div class="label">Type</div><div class="value"><span class="auth-type-label">' + escHtml(authType) + '</span></div></div>';
         if (data.auth.header_name) {
@@ -713,6 +715,14 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       // Pre-fill base URL override
       if (spec.base_url) {
         document.getElementById('rv-baseurl-override').placeholder = spec.base_url;
+      }
+
+      // Update Next button: skip auth label for public APIs
+      const nextBtn = document.getElementById('review-next-btn');
+      if (authType === 'none') {
+        nextBtn.textContent = 'Next: Toolsets';
+      } else {
+        nextBtn.textContent = 'Next: Authentication';
       }
     }
 
@@ -1038,7 +1048,17 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
 
     function goToReview() { showScreen('review', 1); }
 
+    function isNoAuth() {
+      const auth = dryRunData?.auth || {};
+      return !auth.type || auth.type === 'none';
+    }
+
     function goToAuth() {
+      // Skip auth screen entirely for public APIs with no authentication
+      if (isNoAuth()) {
+        goToToolsets();
+        return;
+      }
       populateAuth(dryRunData);
       if (isMultiAuth) {
         showScreen('auth-multi', 2);
@@ -1050,6 +1070,15 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
     function goToToolsets() {
       populateToolsets();
       showScreen('toolsets', 3);
+    }
+
+    function goBackFromToolsets() {
+      // Go back to review (skip auth) for public APIs
+      if (isNoAuth()) {
+        goToReview();
+      } else {
+        goToAuth();
+      }
     }
 
     function goToConfigure() {
