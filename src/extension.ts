@@ -22,14 +22,24 @@ import {
 import { ExploreTreeProvider } from "./views/exploreTree";
 import { VaultTreeProvider } from "./views/vaultTree";
 import { InfoTreeProvider } from "./views/infoTree";
+import { SetupTreeProvider } from "./views/setupTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
 import { showReferencePanel } from "./panels/referencePanel";
+import { showSetupWizardPanel } from "./panels/setupWizardPanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 
 export function activate(context: vscode.ExtensionContext): void {
   const client = new DexClient();
 
+  // Helper to set dexReady context and reveal/hide views
+  async function updateDexReadyContext(): Promise<void> {
+    const ready = await client.isSetupComplete();
+    await vscode.commands.executeCommand("setContext", "modiqo.dexReady", ready);
+    setupTree.setStatus(ready ? "complete" : (await client.isAvailable()) ? "needs-setup" : "not-installed");
+  }
+
   // Tree views
+  const setupTree = new SetupTreeProvider(client);
   const infoTree = new InfoTreeProvider(client);
   const adapterTree = new AdapterTreeProvider(client);
   adapterTree.setExtensionUri(context.extensionUri);
@@ -44,6 +54,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const vaultTree = new VaultTreeProvider(client);
 
   context.subscriptions.push(
+    vscode.window.registerTreeDataProvider("modiqo-setup", setupTree),
     vscode.window.registerTreeDataProvider("modiqo-info", infoTree),
     vscode.window.registerTreeDataProvider("modiqo-adapters", adapterTree),
     vscode.window.registerTreeDataProvider("modiqo-flows", flowTree),
@@ -52,6 +63,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerTreeDataProvider("modiqo-vault", vaultTree),
     vscode.window.registerTreeDataProvider("modiqo-explore", exploreTree)
   );
+
+  // Check initial dex state
+  updateDexReadyContext();
 
   // Status bar
   const statusBar = new DexStatusBar(client);
@@ -77,6 +91,104 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   });
   context.subscriptions.push(...watcherDisposables);
+
+  // Setup commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand("modiqo.installDex", async () => {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Installing dex",
+          cancellable: true,
+        },
+        async (progress, cancellation) => {
+          const { spawn: spawnShell } = await import("child_process");
+          const child = spawnShell("bash", ["-c",
+            "curl -fsSL https://raw.githubusercontent.com/modiqo/dex-releases/main/install.sh | DEX_YES=1 bash"
+          ], {
+            stdio: ["pipe", "pipe", "pipe"],
+            env: { ...process.env },
+          });
+
+          cancellation.onCancellationRequested(() => { child.kill(); });
+
+          const steps = [
+            "Downloading installer...",
+            "Installing dex binary...",
+            "Installing deno runtime...",
+            "Installing TypeScript SDK...",
+          ];
+          let stepIdx = 0;
+
+          progress.report({ message: steps[0] });
+
+          const advance = (text: string) => {
+            if (text.includes("deno") && stepIdx < 2) {
+              stepIdx = 2;
+              progress.report({ message: steps[2], increment: 25 });
+            } else if (text.includes("sdk") || text.includes("SDK") || text.includes("typescript")) {
+              stepIdx = 3;
+              progress.report({ message: steps[3], increment: 25 });
+            } else if ((text.includes("install") || text.includes("download")) && stepIdx < 1) {
+              stepIdx = 1;
+              progress.report({ message: steps[1], increment: 25 });
+            }
+          };
+
+          child.stdout?.on("data", (data: Buffer) => advance(data.toString().toLowerCase()));
+          child.stderr?.on("data", (data: Buffer) => advance(data.toString().toLowerCase()));
+
+          const exitCode = await new Promise<number | null>((resolve) => {
+            child.on("close", resolve);
+            child.on("error", () => resolve(1));
+          });
+
+          if (exitCode === 0) {
+            // Force status to needs-setup immediately (don't wait for async detection)
+            setupTree.setStatus("needs-setup");
+            await updateDexReadyContext();
+            vscode.window.showInformationMessage(
+              "dex installed successfully! Click Begin Setup to configure.",
+            );
+          } else if (!cancellation.isCancellationRequested) {
+            vscode.window.showErrorMessage(
+              "dex installation failed. Try running manually: curl -fsSL https://raw.githubusercontent.com/modiqo/dex-releases/main/install.sh | DEX_YES=1 bash",
+            );
+          }
+        },
+      );
+    }),
+    vscode.commands.registerCommand("modiqo.openSetupWizard", () => {
+      showSetupWizardPanel(context.extensionUri, client, {
+        onAdaptersInstalled: () => {
+          // Progressively reveal adapters, flows, and workspaces in sidebar
+          vscode.commands.executeCommand("setContext", "modiqo.dexReady", true);
+          adapterTree.refresh();
+          flowTree.refresh();
+          workspaceTree.refresh();
+          statusBar.refresh();
+        },
+        onTokensConfigured: () => {
+          // Refresh vault and adapters when tokens change
+          vaultTree.refresh();
+          adapterTree.refresh();
+          statusBar.refresh();
+        },
+        onComplete: () => {
+          vscode.commands.executeCommand("setContext", "modiqo.dexReady", true);
+          setupTree.setStatus("complete");
+          adapterTree.refresh();
+          flowTree.refresh();
+          workspaceTree.refresh();
+          registryTree.refresh();
+          vaultTree.refresh();
+          exploreTree.refresh();
+          statusBar.refresh();
+          vscode.window.showInformationMessage("dex setup complete!");
+        },
+      });
+    }),
+  );
 
   // Commands
   context.subscriptions.push(

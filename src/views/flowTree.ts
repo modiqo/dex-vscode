@@ -1,4 +1,7 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { DexClient, Flow } from "../client/dexClient";
 
 export class FlowTreeItem extends vscode.TreeItem {
@@ -71,7 +74,21 @@ export class FlowTreeProvider
   async getChildren(element?: FlowTreeItem): Promise<FlowTreeItem[]> {
     if (!element) {
       try {
-        this.flows = await this.client.flowList();
+        const allFlows = await this.client.flowList();
+        // Filter to only show flows whose adapter is installed
+        const adaptersDir = path.join(os.homedir(), ".dex", "adapters");
+        let installedIds = new Set<string>();
+        try {
+          const dirs = fs.readdirSync(adaptersDir).filter((d) => {
+            try { return fs.statSync(path.join(adaptersDir, d)).isDirectory(); } catch { return false; }
+          });
+          installedIds = new Set(dirs);
+        } catch { /* no adapters dir */ }
+        this.flows = allFlows.filter((f) => {
+          if (!f.adapter) { return true; }
+          const adapterId = f.adapter.replace("adapter/", "");
+          return installedIds.has(adapterId);
+        });
       } catch {
         this.flows = [];
       }
