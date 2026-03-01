@@ -142,7 +142,7 @@ function buildRiverSvg(sourceTokens: number, resultTokens: number, reductionPct:
     <!-- Labels -->
     <text x="8" y="55" class="river-label river-label-in">${fmtTokensShort(sourceTokens)} in</text>
     <text x="592" y="55" text-anchor="end" class="river-label river-label-out">${fmtTokensShort(resultTokens)} out</text>
-    ${reductionPct > 0 ? `<text x="300" y="16" text-anchor="middle" class="river-label river-label-delta">-${reductionPct}%</text>` : ""}
+    ${reductionPct > 0 ? `<text x="300" y="16" text-anchor="middle" class="river-label river-label-delta">${reductionPct}% reduced</text>` : ""}
   </svg>`;
 }
 
@@ -336,6 +336,24 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
     margin-bottom: 10px;
   }
   .river-svg { width: 100%; height: auto; }
+  .river-caption {
+    margin-top: 14px;
+    padding: 12px 16px;
+    font-size: 0.82em;
+    line-height: 1.6;
+    color: var(--fg);
+    background: var(--ticker-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .river-caption strong { color: var(--success); font-weight: 600; }
+  .river-caption code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: color-mix(in srgb, var(--success) 10%, transparent);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
   .river-label {
     font-family: var(--mono);
     font-size: 11px;
@@ -537,6 +555,9 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
   <div class="river-section">
     <div class="section-label">Token Flow</div>
     ${buildRiverSvg(stats.totalSourceTokens, stats.totalResultTokens, stats.reductionPct)}
+    <div class="river-caption">
+      The API sent back <strong>${fmtTokensShort(stats.totalSourceTokens)}</strong> tokens of raw JSON. Through caching and selective extraction (e.g. <code>dex @1 '.data[0].amount'</code>), only <strong>${fmtTokensShort(stats.totalResultTokens)}</strong> reached the agent\u2019s context.${stats.reductionPct > 0 ? ` That\u2019s a <strong>${stats.reductionPct}% reduction</strong> \u2014 ${stats.reduction.toLocaleString()} tokens your agent never had to process.` : ""}
+    </div>
   </div>
 
   <!-- Waffle Grid + Compression Rune -->
@@ -621,6 +642,7 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
       if (!s) return '';
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
+
   </script>
 </body>
 </html>`;
