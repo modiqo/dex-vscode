@@ -199,6 +199,7 @@ async function handleInstallAdapters(
   client: DexClient,
   adapterIds: string[],
 ): Promise<void> {
+  const alreadyPulled = new Set<string>();
   for (const id of adapterIds) {
     panel.webview.postMessage({
       type: "install-progress",
@@ -252,7 +253,7 @@ async function handleInstallAdapters(
         logs: recent,
       });
 
-      const skillCount = await client.pullAssociatedSkills(id);
+      const skillCount = await client.pullAssociatedSkills(id, alreadyPulled);
       const msg = skillCount > 0
         ? `Installed (${skillCount} flow${skillCount !== 1 ? "s" : ""})`
         : "Installed";
@@ -344,6 +345,8 @@ async function handleProofOfLife(
   adapterIds: string[],
 ): Promise<void> {
   const results: ProofResult[] = [];
+  // Dedup: adapters sharing the same proof flow (e.g. polymarket-data & polymarket-gamma)
+  const seenFlows = new Map<string, ProofResult>();
 
   for (const id of adapterIds) {
     panel.webview.postMessage({
@@ -352,7 +355,13 @@ async function handleProofOfLife(
       status: "running",
     });
 
-    const result = await client.runProofOfLife(id);
+    // Check if another adapter already ran the same proof flow
+    const flowKey = client.proofFlowKey(id);
+    const cached = flowKey ? seenFlows.get(flowKey) : undefined;
+    const result = cached
+      ? { ...cached, adapter: id }
+      : await client.runProofOfLife(id);
+    if (flowKey && !cached) { seenFlows.set(flowKey, result); }
     results.push(result);
 
     panel.webview.postMessage({

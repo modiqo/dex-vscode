@@ -687,14 +687,33 @@ export class DexClient {
     return child;
   }
 
+  /** Map adapter IDs to search terms for skill discovery.
+   *  Some adapters (e.g. polymarket-data, polymarket-gamma) share skills
+   *  that are indexed under a different search term. */
+  private skillSearchTerm(adapterId: string): string {
+    switch (adapterId) {
+      case "polymarket-data":
+      case "polymarket-gamma":
+        return "polymarket";
+      default:
+        return adapterId;
+    }
+  }
+
   /** Pull associated skills/flows for an installed adapter.
    *  Uses `dex registry skill search <adapterId>` to get full (non-truncated) names,
    *  then pulls each matching skill. */
-  async pullAssociatedSkills(adapterId: string): Promise<number> {
+  async pullAssociatedSkills(adapterId: string, alreadyPulled?: Set<string>): Promise<number> {
+    const searchTerm = this.skillSearchTerm(adapterId);
+
+    // Skip if another adapter already searched with the same term (dedup for shared skills)
+    if (alreadyPulled?.has(searchTerm)) { return 0; }
+    alreadyPulled?.add(searchTerm);
+
     // Search for skills associated with this adapter
     let searchOutput: string;
     try {
-      searchOutput = await this.execText(["registry", "skill", "search", adapterId]);
+      searchOutput = await this.execText(["registry", "skill", "search", searchTerm]);
     } catch {
       return 0;
     }
@@ -763,6 +782,12 @@ export class DexClient {
     return this.registrySkillList("bootstrap");
   }
 
+  /** Get the proof flow key for dedup — adapters sharing a flow return the same key */
+  proofFlowKey(adapterId: string): string | null {
+    const proof = this.proofFlowFor(adapterId);
+    return proof ? proof.flowName : null;
+  }
+
   /** Get proof-of-life flow details for an adapter (mirrors Rust proof_flow_for) */
   private proofFlowFor(adapterId: string): { flowName: string; args: string[] } | null {
     const summary = "--output=summary";
@@ -784,6 +809,9 @@ export class DexClient {
       }
       case "linear":
         return { flowName: "list-linear-issues", args: ["5", summary] };
+      case "polymarket-data":
+      case "polymarket-gamma":
+        return { flowName: "whale-flow-monitor", args: ["crypto", "3", "50000", summary] };
       default:
         return null;
     }
