@@ -25,7 +25,7 @@ import { InfoTreeProvider } from "./views/infoTree";
 import { SetupTreeProvider } from "./views/setupTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
 import { showReferencePanel } from "./panels/referencePanel";
-import { showSetupWizardPanel } from "./panels/setupWizardPanel";
+import { showSetupWizardPanel, showInstallPanel } from "./panels/setupWizardPanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -95,68 +95,55 @@ export function activate(context: vscode.ExtensionContext): void {
   // Setup commands
   context.subscriptions.push(
     vscode.commands.registerCommand("modiqo.installDex", async () => {
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Installing dex",
-          cancellable: true,
-        },
-        async (progress, cancellation) => {
-          const { spawn: spawnShell } = await import("child_process");
-          const child = spawnShell("bash", ["-c",
-            "curl -fsSL https://raw.githubusercontent.com/modiqo/dex-releases/main/install.sh | DEX_YES=1 bash"
-          ], {
-            stdio: ["pipe", "pipe", "pipe"],
-            env: { ...process.env },
-          });
+      const panel = showInstallPanel(context.extensionUri, async () => {
+        // "Begin Setup" clicked after install completes
+        setupTree.setStatus("needs-setup");
+        await updateDexReadyContext();
+        // Open the setup wizard automatically
+        vscode.commands.executeCommand("modiqo.openSetupWizard");
+      });
 
-          cancellation.onCancellationRequested(() => { child.kill(); });
+      const { spawn: spawnShell } = await import("child_process");
+      const child = spawnShell("bash", ["-c",
+        "curl -fsSL https://raw.githubusercontent.com/modiqo/dex-releases/main/install.sh | DEX_YES=1 bash"
+      ], {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env },
+      });
 
-          const steps = [
-            "Downloading installer...",
-            "Installing dex binary...",
-            "Installing deno runtime...",
-            "Installing TypeScript SDK...",
-          ];
-          let stepIdx = 0;
+      let currentStep = "download";
 
-          progress.report({ message: steps[0] });
+      const advance = (text: string) => {
+        const lower = text.toLowerCase();
+        if (lower.includes("deno") && currentStep !== "deno" && currentStep !== "sdk") {
+          currentStep = "deno";
+          panel.webview.postMessage({ type: "install-step", step: "deno" });
+        } else if ((lower.includes("sdk") || lower.includes("typescript")) && currentStep !== "sdk") {
+          currentStep = "sdk";
+          panel.webview.postMessage({ type: "install-step", step: "sdk" });
+        } else if ((lower.includes("install") || lower.includes("binary")) && currentStep === "download") {
+          currentStep = "binary";
+          panel.webview.postMessage({ type: "install-step", step: "binary" });
+        }
+      };
 
-          const advance = (text: string) => {
-            if (text.includes("deno") && stepIdx < 2) {
-              stepIdx = 2;
-              progress.report({ message: steps[2], increment: 25 });
-            } else if (text.includes("sdk") || text.includes("SDK") || text.includes("typescript")) {
-              stepIdx = 3;
-              progress.report({ message: steps[3], increment: 25 });
-            } else if ((text.includes("install") || text.includes("download")) && stepIdx < 1) {
-              stepIdx = 1;
-              progress.report({ message: steps[1], increment: 25 });
-            }
-          };
+      child.stdout?.on("data", (data: Buffer) => advance(data.toString()));
+      child.stderr?.on("data", (data: Buffer) => advance(data.toString()));
 
-          child.stdout?.on("data", (data: Buffer) => advance(data.toString().toLowerCase()));
-          child.stderr?.on("data", (data: Buffer) => advance(data.toString().toLowerCase()));
+      const exitCode = await new Promise<number | null>((resolve) => {
+        child.on("close", resolve);
+        child.on("error", () => resolve(1));
+      });
 
-          const exitCode = await new Promise<number | null>((resolve) => {
-            child.on("close", resolve);
-            child.on("error", () => resolve(1));
-          });
-
-          if (exitCode === 0) {
-            // Force status to needs-setup immediately (don't wait for async detection)
-            setupTree.setStatus("needs-setup");
-            await updateDexReadyContext();
-            vscode.window.showInformationMessage(
-              "dex installed successfully! Click Begin Setup to configure.",
-            );
-          } else if (!cancellation.isCancellationRequested) {
-            vscode.window.showErrorMessage(
-              "dex installation failed. Try running manually: curl -fsSL https://raw.githubusercontent.com/modiqo/dex-releases/main/install.sh | DEX_YES=1 bash",
-            );
-          }
-        },
-      );
+      if (exitCode === 0) {
+        panel.webview.postMessage({ type: "install-done" });
+      } else {
+        panel.webview.postMessage({
+          type: "install-error",
+          step: currentStep,
+          message: "Installation failed",
+        });
+      }
     }),
     vscode.commands.registerCommand("modiqo.openSetupWizard", () => {
       showSetupWizardPanel(context.extensionUri, client, {
@@ -184,7 +171,8 @@ export function activate(context: vscode.ExtensionContext): void {
           vaultTree.refresh();
           exploreTree.refresh();
           statusBar.refresh();
-          vscode.window.showInformationMessage("dex setup complete!");
+          // Focus the workspaces tree to draw attention away from setup
+          vscode.commands.executeCommand("modiqo-workspaces.focus");
         },
       });
     }),

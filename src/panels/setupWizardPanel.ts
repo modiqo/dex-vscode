@@ -755,6 +755,181 @@ h2 {
   margin-bottom: 16px;
 }
 
+/* ── Catalog: Selection strip ────────────── */
+.selection-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.selection-strip:empty { display: none; }
+.selection-strip-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.4;
+  margin-right: 4px;
+}
+.selection-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 12px;
+  border-radius: 16px;
+  background: rgba(var(--glow-color), 0.08);
+  border: 1px solid rgba(var(--glow-color), 0.18);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  animation: step-enter-forward 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.selection-tag:hover { background: rgba(var(--glow-color), 0.14); }
+.selection-tag .tag-x {
+  font-size: 10px;
+  opacity: 0.5;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+.selection-tag:hover .tag-x { opacity: 1; }
+
+/* ── Catalog: Category sections ──────────── */
+.catalog-section {
+  margin-bottom: 28px;
+}
+.catalog-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.35;
+  margin-bottom: 12px;
+  padding-left: 2px;
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+/* ── Catalog: Adapter cards ──────────────── */
+.catalog-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  position: relative;
+}
+.catalog-card:hover {
+  border-color: rgba(var(--glow-color), 0.25);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.catalog-card.selected {
+  border-color: var(--accent);
+  background: rgba(var(--glow-color), 0.03);
+}
+.catalog-card.selected::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 11px;
+  border: 1.5px solid var(--accent);
+  pointer-events: none;
+  animation: success-ripple 0.35s ease-out;
+}
+
+.catalog-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background 0.18s, opacity 0.18s;
+}
+body.vscode-dark .catalog-icon { background: rgba(255,255,255,0.06); }
+body.vscode-light .catalog-icon { background: rgba(0,0,0,0.04); }
+.catalog-card.selected .catalog-icon {
+  background: rgba(var(--glow-color), 0.12);
+}
+
+.catalog-icon svg { width: 18px; height: 18px; opacity: 0.6; }
+.catalog-card.selected .catalog-icon svg { opacity: 1; color: var(--accent); }
+
+.catalog-body { flex: 1; min-width: 0; }
+.catalog-name {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 3px;
+  letter-spacing: -0.01em;
+}
+.catalog-desc {
+  font-size: 11px;
+  opacity: 0.45;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.catalog-card.selected .catalog-desc { opacity: 0.6; }
+
+.catalog-toggle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  margin-top: 2px;
+}
+.catalog-card.selected .catalog-toggle {
+  border-color: var(--accent);
+  background: var(--accent);
+  animation: check-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.catalog-toggle-check { display: none; }
+.catalog-card.selected .catalog-toggle-check { display: block; }
+
+/* ── Catalog: Floating install bar ───────── */
+.install-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 24px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  z-index: 10;
+  animation: step-enter-forward 0.25s ease;
+}
+body.vscode-dark .install-bar { background: rgba(30, 30, 30, 0.92); backdrop-filter: blur(8px); }
+body.vscode-light .install-bar { background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px); }
+.install-bar .install-count {
+  font-size: 13px;
+  opacity: 0.6;
+  flex: 1;
+}
+
 .card-list {
   display: flex;
   flex-direction: column;
@@ -914,53 +1089,130 @@ h2 {
 
 /* ── Wire client cards ───────────────────── */
 
+.wire-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
 .wire-card {
   background: var(--card-bg);
-  border: 2px solid var(--card-border);
-  border-radius: 8px;
-  padding: 16px 24px;
+  border: 1.5px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
 }
-
+.wire-card:hover {
+  border-color: rgba(var(--glow-color), 0.25);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
 .wire-card.selected {
   border-color: var(--accent);
-  background: rgba(var(--glow-color), 0.04);
+  background: rgba(var(--glow-color), 0.03);
+}
+.wire-card.selected::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 13px;
+  border: 1.5px solid var(--accent);
+  pointer-events: none;
 }
 
-.wire-icon {
-  font-size: 24px;
-  flex-shrink: 0;
-  width: 32px;
-  text-align: center;
-  opacity: 0.8;
-}
-
-.wire-info { flex: 1; }
-.wire-name { font-weight: 500; font-size: 14px; }
-.wire-desc { font-size: 12px; opacity: 0.5; }
-
-.wire-check {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border);
-  border-radius: 4px;
+.wire-brand {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
   flex-shrink: 0;
 }
+body.vscode-dark .wire-brand { background: rgba(255,255,255,0.07); }
+body.vscode-light .wire-brand { background: rgba(0,0,0,0.05); }
+.wire-card.selected .wire-brand { background: rgba(var(--glow-color), 0.12); }
+.wire-brand svg { width: 24px; height: 24px; opacity: 0.7; }
+.wire-card.selected .wire-brand svg { opacity: 1; }
 
-.wire-card.selected .wire-check {
+.wire-info { flex: 1; }
+.wire-name { font-weight: 600; font-size: 14px; margin-bottom: 3px; }
+.wire-desc { font-size: 11px; opacity: 0.45; line-height: 1.4; }
+.wire-card.selected .wire-desc { opacity: 0.6; }
+
+.wire-toggle {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.wire-card.selected .wire-toggle {
   border-color: var(--accent);
   background: var(--accent);
-  color: #000;
-  animation: check-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: check-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+.wire-toggle-check { display: none; }
+.wire-card.selected .wire-toggle-check { display: block; }
+
+/* ── MCP bundle ──────────────────────────── */
+.mcp-bundle {
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.mcp-bundle-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(var(--glow-color), 0.03);
+  border-bottom: 1px solid var(--card-border);
+}
+body.vscode-dark .mcp-bundle-header { background: rgba(255,255,255,0.02); }
+.mcp-bundle-title { font-weight: 600; font-size: 13px; }
+.mcp-bundle-sub { font-size: 11px; opacity: 0.5; }
+.mcp-bundle-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: rgba(var(--glow-success), 0.12);
+  color: var(--success);
+  margin-left: auto;
+}
+.mcp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+}
+.mcp-item:last-child { padding-bottom: 12px; }
+.mcp-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.mcp-item-name { font-size: 12px; font-weight: 500; }
+.mcp-item-desc { font-size: 11px; opacity: 0.4; margin-left: 4px; }
 
 /* ── Proof of life ───────────────────────── */
 
@@ -1002,17 +1254,17 @@ h2 {
 
 .vault-status-banner {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 8px;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
   margin-bottom: 16px;
   animation: step-enter-forward 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .vault-status-banner.success { background: rgba(var(--glow-success), 0.08); border: 1px solid rgba(var(--glow-success), 0.2); }
 .vault-status-banner.error { background: rgba(241, 76, 76, 0.08); border: 1px solid rgba(241, 76, 76, 0.2); }
 .vault-status-title { font-weight: 500; font-size: 13px; }
-.vault-status-hint { font-size: 11px; margin-top: 2px; }
+.vault-status-hint { font-size: 12px; margin-top: 2px; opacity: 0.7; }
 
 /* ── Verification cards ─────────────────── */
 .verify-list { display: flex; flex-direction: column; gap: 12px; }
@@ -1187,6 +1439,15 @@ body.vscode-light .hero-logo { filter: drop-shadow(0 0 16px rgba(56, 100, 180, 0
   letter-spacing: -0.5px;
 }
 
+.hero-wordmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.hero-wordmark svg { height: 32px; }
+
 .hero .tagline {
   font-size: 15px;
   opacity: 0.45;
@@ -1197,48 +1458,135 @@ body.vscode-light .hero-logo { filter: drop-shadow(0 0 16px rgba(56, 100, 180, 0
 
 .complete-hero {
   text-align: center;
-  padding: 32px 0 8px;
+  padding: 24px 0 0;
 }
 
 .complete-logo {
   display: inline-block;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   animation: hue-drift 4s ease-in-out infinite;
 }
 
-.complete-logo svg { width: 48px; height: 48px; color: var(--success); }
+.complete-logo svg { width: 40px; height: 40px; color: var(--success); }
 
-.complete-hero h1 { color: var(--success); }
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin: 32px 0;
+.complete-hero h1 {
+  color: var(--success);
+  font-weight: 300;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
 }
 
-.summary-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
-  padding: 24px 16px;
+.complete-hero .subtitle { margin-bottom: 0; }
+
+/* Summary stats row */
+.summary-row {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  padding: 20px 0;
+  margin: 0 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.summary-stat {
   text-align: center;
   opacity: 0;
   animation: stagger-in 0.4s ease forwards;
 }
-
-.summary-card:nth-child(1) { animation-delay: 0.1s; }
-.summary-card:nth-child(2) { animation-delay: 0.2s; }
-.summary-card:nth-child(3) { animation-delay: 0.3s; }
-
-.summary-number {
-  font-size: 28px;
+.summary-stat:nth-child(1) { animation-delay: 0.1s; }
+.summary-stat:nth-child(2) { animation-delay: 0.2s; }
+.summary-stat:nth-child(3) { animation-delay: 0.3s; }
+.summary-stat-num {
+  font-size: 22px;
   font-weight: 300;
   color: var(--accent);
-  margin-bottom: 4px;
+  line-height: 1;
+}
+.summary-stat-label { font-size: 10px; opacity: 0.45; margin-top: 4px; letter-spacing: 0.04em; }
+
+/* Try it section */
+.try-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.35;
+  margin-bottom: 14px;
 }
 
-.summary-label { font-size: 12px; opacity: 0.5; }
+.try-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  opacity: 0;
+  animation: stagger-in 0.4s ease forwards;
+}
+.try-card:nth-child(2) { animation-delay: 0.15s; }
+.try-card:nth-child(3) { animation-delay: 0.25s; }
+.try-card:nth-child(4) { animation-delay: 0.35s; }
+
+.try-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+body.vscode-dark .try-icon { background: rgba(255,255,255,0.06); }
+body.vscode-light .try-icon { background: rgba(0,0,0,0.04); }
+.try-icon svg { width: 18px; height: 18px; opacity: 0.6; }
+
+.try-body { flex: 1; min-width: 0; }
+.try-tool {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.try-tool-badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  opacity: 0.7;
+}
+body.vscode-dark .try-tool-badge { background: rgba(255,255,255,0.08); }
+body.vscode-light .try-tool-badge { background: rgba(0,0,0,0.06); }
+
+.try-prompt {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+body.vscode-dark .try-prompt { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
+body.vscode-light .try-prompt { background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.06); }
+
+.try-prompt .cmd {
+  color: var(--accent);
+  font-weight: 600;
+}
+.try-prompt .query { opacity: 0.7; }
+
+.try-desc {
+  font-size: 11px;
+  opacity: 0.45;
+  margin-top: 4px;
+  line-height: 1.4;
+}
 
 /* ── OAuth scope toggle chips ────────────── */
 
@@ -1251,9 +1599,12 @@ body.vscode-light .hero-logo { filter: drop-shadow(0 0 16px rgba(56, 100, 180, 0
 
 .scope-chip {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 14px 14px;
   border-radius: 8px;
   border: 1.5px solid var(--card-border);
   background: var(--card-bg);
@@ -1347,29 +1698,234 @@ body.vscode-light .hero-logo { filter: drop-shadow(0 0 16px rgba(56, 100, 180, 0
 .log-buffer.errored .log-line:last-child { color: var(--error); }
 .log-buffer.errored .log-line:last-child::after { display: none; }
 
-/* ── Install counter ─────────────────────── */
-.install-counter {
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  opacity: 0.6;
-  margin-bottom: 16px;
-  transition: opacity 0.3s, color 0.3s;
+/* ── Install pipeline ────────────────────── */
+.install-pipeline {
+  position: relative;
+  padding-left: 32px;
 }
-.install-counter.text-success { opacity: 1; }
+.install-pipeline::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.install-pipeline.all-done::before {
+  background: var(--success);
+}
 
-.proof-card.active {
+.pipeline-item {
+  position: relative;
+  padding: 0 0 28px 0;
+  animation: step-enter-forward 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pipeline-item:last-child { padding-bottom: 0; }
+
+/* Pipeline node dot */
+.pipeline-node {
+  position: absolute;
+  left: -32px;
+  top: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.pipeline-node.queued {
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+}
+.pipeline-node.queued::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.pipeline-node.active {
+  background: var(--accent);
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 4px rgba(var(--glow-color), 0.15);
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+.pipeline-node.active svg { color: #000; }
+
+.pipeline-node.success {
+  background: var(--success);
+  border: 2px solid var(--success);
+  animation: check-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pipeline-node.error {
+  background: var(--error);
+  border: 2px solid var(--error);
+}
+
+.pipeline-node svg { width: 12px; height: 12px; }
+
+/* Pipeline card content */
+.pipeline-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+.pipeline-item.active .pipeline-card {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 2px 12px rgba(79, 193, 255, 0.08);
+  box-shadow: 0 4px 20px rgba(var(--glow-color), 0.08);
+}
+.pipeline-item.success .pipeline-card {
+  border-color: rgba(var(--glow-success), 0.3);
+}
+.pipeline-item.error .pipeline-card {
+  border-color: rgba(241, 76, 76, 0.3);
 }
 
-.proof-status {
-  font-size: 12px;
+.pipeline-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.pipeline-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+body.vscode-dark .pipeline-icon { background: rgba(255,255,255,0.06); }
+body.vscode-light .pipeline-icon { background: rgba(0,0,0,0.04); }
+.pipeline-item.active .pipeline-icon { background: rgba(var(--glow-color), 0.1); }
+.pipeline-item.success .pipeline-icon { background: rgba(var(--glow-success), 0.1); }
+.pipeline-icon svg { width: 16px; height: 16px; opacity: 0.6; }
+.pipeline-item.active .pipeline-icon svg { opacity: 1; color: var(--accent); }
+.pipeline-item.success .pipeline-icon svg { opacity: 1; color: var(--success); }
+
+.pipeline-info { flex: 1; min-width: 0; }
+.pipeline-name { font-weight: 600; font-size: 13px; }
+.pipeline-status {
+  font-size: 11px;
+  opacity: 0.5;
   margin-top: 2px;
-  transition: color 0.2s;
+  transition: all 0.2s;
 }
+.pipeline-item.active .pipeline-status { opacity: 0.8; color: var(--accent); }
+.pipeline-item.success .pipeline-status { opacity: 1; color: var(--success); }
+.pipeline-item.error .pipeline-status { opacity: 1; color: var(--error); }
 
-.log-cursor { animation: blink 1s step-end infinite; }
+.pipeline-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.pipeline-badge.queued { background: rgba(128,128,128,0.1); opacity: 0.4; }
+.pipeline-badge.active { background: rgba(var(--glow-color), 0.12); color: var(--accent); }
+.pipeline-badge.success { background: rgba(var(--glow-success), 0.12); color: var(--success); }
+.pipeline-badge.error { background: rgba(241,76,76,0.12); color: var(--error); }
+
+/* Pipeline terminal log */
+.pipeline-log {
+  border-top: 1px solid var(--border);
+  padding: 10px 16px 12px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  line-height: 1.6;
+  max-height: 80px;
+  overflow-y: auto;
+  transition: max-height 0.3s ease;
+}
+.pipeline-log .log-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+.pipeline-log .log-line:last-child { opacity: 0.8; color: var(--accent); }
+.pipeline-log .log-cursor {
+  display: inline;
+  animation: blink 1s step-end infinite;
+  color: var(--accent);
+}
+.pipeline-item.success .pipeline-log { display: none; }
+.pipeline-item.error .pipeline-log .log-line:last-child { color: var(--error); }
+
+/* Pipeline overall progress bar */
+.pipeline-progress-wrap {
+  margin-bottom: 24px;
+}
+.pipeline-progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.pipeline-progress-text {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.6;
+  transition: all 0.3s;
+}
+.pipeline-progress-text.done { opacity: 1; color: var(--success); }
+.pipeline-progress-pct {
+  font-size: 24px;
+  font-weight: 300;
+  letter-spacing: -1px;
+  transition: color 0.3s;
+}
+.pipeline-progress-pct.done { color: var(--success); }
+.pipeline-track {
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+body.vscode-dark .pipeline-track { background: rgba(255,255,255,0.08); }
+body.vscode-light .pipeline-track { background: rgba(0,0,0,0.06); }
+.pipeline-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+.pipeline-fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -1px;
+  width: 20px;
+  height: 5px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4));
+  border-radius: 2px;
+  animation: shimmer 1.5s infinite;
+}
+.pipeline-fill.done { background: var(--success); }
+.pipeline-fill.done::after { display: none; }
+
+@keyframes shimmer {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 /* ── Passphrase modal ────────────────────── */
 
@@ -1489,13 +2045,17 @@ let tokenRequirements = [];
 let selectedWireClients = new Set();
 let proofResults = {};
 
-const POPULAR = ['github', 'stripe', 'gmail', 'slack', 'jira', 'notion', 'linear'];
+const POPULAR = ['github', 'gmail', 'calendar', 'stripe'];
 
 const WIRE_CLIENTS = [
-  { id: 'dex-skill-claude-code', name: 'Claude Code', desc: 'Wire dex tools into Claude Code' },
-  { id: 'dex-skill-cursor', name: 'Cursor', desc: 'Wire dex tools into Cursor IDE' },
-  { id: 'dex-skill-codex', name: 'Codex', desc: 'Wire dex tools into OpenAI Codex' },
-  { id: 'dex-agents-md', name: 'AGENTS.md', desc: 'Generate an AGENTS.md reference file' },
+  { id: 'dex-skill-claude-code', name: 'Claude Code', desc: 'Wire dex MCP tools into Anthropic Claude Code',
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg>' },
+  { id: 'dex-skill-cursor', name: 'Cursor', desc: 'Wire dex MCP tools into Cursor AI IDE',
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg>' },
+  { id: 'dex-skill-codex', name: 'Codex', desc: 'Wire dex MCP tools into OpenAI Codex CLI',
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>' },
+  { id: 'dex-agents-md', name: 'AGENTS.md', desc: 'Generate an AGENTS.md reference for any AI tool',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>' },
 ];
 
 // ── Procedural SVG: stipple-dot concentric mark ──
@@ -1638,8 +2198,10 @@ function escapeHtml(s) {
 function renderWelcome(el) {
   el.innerHTML = \`
     <div class="hero">
-      <div class="hero-logo">\${buildStippleSvg(120)}</div>
-      <h1>modiqo dex</h1>
+      <div class="hero-wordmark">
+        <span style="font-size:36px; font-weight:300; letter-spacing:-0.5px;">modiq<span style="display:inline-block; width:0.52em; height:0.52em; background:#E87A2A; border-radius:50%; vertical-align:baseline; margin:0 0.01em; position:relative; top:-0.05em;"></span></span>
+        <span style="font-size:36px; font-weight:200; letter-spacing:-0.5px; opacity:0.45; margin-left:10px;">dex</span>
+      </div>
       <div class="tagline">Any API. Agent-ready. One command.</div>
       <button class="btn btn-primary" onclick="next()">
         Let's get started \\u2192
@@ -1732,12 +2294,63 @@ function handleLoginStatus(msg) {
   }
 }
 
-// ── Step 2: Adapter Selection ──────────────
+// ── Step 2: Adapter Catalog ───────────────
+
+const ADAPTER_CATEGORIES = {
+  'Communication': ['gmail', 'slack', 'calendar', 'elevenlabs'],
+  'Development': ['github', 'linear', 'cloudflare'],
+  'Knowledge': ['notion', 'googledocs'],
+  'Search': ['exasearch', 'parallelweb'],
+  'Data & Analytics': ['stripe', 'astronomer', 'drive-api-v3'],
+  'AI & Automation': ['gemini-api', 'manusai'],
+};
+
+const ADAPTER_ICONS = {
+  github: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>',
+  gmail: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12a1 1 0 011 1v8a1 1 0 01-1 1H2a1 1 0 01-1-1V4a1 1 0 011-1zm0 1.5v7h12v-7L8 9 2 4.5zm.5-.5L8 7.5 13.5 4h-11z"/></svg>',
+  stripe: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 4a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V4zm5.5 1.5c-.83 0-1.5.28-1.5.75 0 .78 1.13.88 2.25 1.12C9.5 7.63 11 8 11 9.5 11 11.15 9.5 12 7.75 12c-1.08 0-2.19-.33-3-.83l.5-1.17c.67.42 1.58.75 2.5.75.83 0 1.5-.28 1.5-.75 0-.78-1.13-.88-2.25-1.12C5.75 8.62 4.5 8.25 4.5 6.75 4.5 5.1 6 4.25 7.5 4.25c.92 0 1.83.25 2.5.58l-.5 1.17c-.5-.28-1.25-.5-2-.5z"/></svg>',
+  notion: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.3 1.5l7.2-.5c.9-.07 1.1 0 1.7.4l2.3 1.6c.4.3.5.4.5.7v9.2c0 .6-.2.9-1 1l-7.8.5c-.6 0-.8-.1-1.1-.4L2.9 11c-.4-.5-.5-.8-.5-1.3V2.8c0-.6.2-1.1.9-1.3zM10 3.6v7.4l-5.4.3V4.2L10 3.6zM9.6 2.3L5 2.7l-.2.1v.3l5.2-.5-.1-.2-.3-.1z"/></svg>',
+  linear: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.62 10.76a7.98 7.98 0 003.62 3.62L1.62 10.76zm.55-1.72a8 8 0 004.79 4.79L1.5 8.37a3.6 3.6 0 00.67.67zm1.28-1.28a8 8 0 005.31 5.31c.5-.1.97-.25 1.42-.45L2.63 5.07c-.2.45-.35.92-.45 1.42l.27.27zm1.5-2.35l6.64 6.64a8 8 0 001.25-1.21L4.79 5.79l-.84.62zM5.79 4.16l6.05 6.05A8 8 0 0013.75 8c0-3.87-2.75-7.1-6.4-7.84L5.79 4.16zM8.02.07A8 8 0 0115.93 8c0 1.56-.45 3.02-1.22 4.25L8.02.07z"/></svg>',
+  calendar: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 1v1H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V3a1 1 0 00-1-1h-2V1h-1v1H6V1H5zm-2 4h10v8H3V5zm2 2v1h2V7H5zm3 0v1h2V7H8zm-3 3v1h2v-1H5zm3 0v1h2v-1H8z"/></svg>',
+  cloudflare: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.3 11.5H4a.5.5 0 010-1l7-.1c.5 0 1-.4 1.1-.9l.2-.8c0-.1 0-.2-.1-.3-.7-2-2.5-3.4-4.7-3.4-2.4 0-4.4 1.7-4.9 3.9-.4-.3-.9-.4-1.4-.3-.9.1-1.6.9-1.7 1.8 0 .2 0 .4.1.6C.2 11.3.7 11.5 1.3 11.5H2"/><path d="M13 8.8c.1-.3-.1-.5-.3-.5h-1c-.2 0-.3.1-.4.2l-.3 1.1c-.1.3.1.5.3.5h1.2c.1 0 .3-.1.3-.2l.2-1.1z"/></svg>',
+  elevenlabs: '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="6" y="2" width="2" height="12" rx="1"/><rect x="10" y="2" width="2" height="12" rx="1"/></svg>',
+  'gemini-api': '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM6.5 5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm3 0a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM4.5 9h7a.5.5 0 01.4.8A4.48 4.48 0 018 12a4.48 4.48 0 01-3.9-2.2.5.5 0 01.4-.8z"/></svg>',
+  googledocs: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l4 4v9a1 1 0 01-1 1H4a1 1 0 01-1-1V2a1 1 0 011-1zm4.5 1H4v12h8V5.5H8.5V2zM5 8h6v1H5V8zm0 2h6v1H5v-1zm0 2h4v1H5v-1z"/></svg>',
+  exasearch: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 1a5.5 5.5 0 014.38 8.82l3.15 3.15a.75.75 0 01-1.06 1.06l-3.15-3.15A5.5 5.5 0 116.5 1zm0 1.5a4 4 0 100 8 4 4 0 000-8z"/></svg>',
+  manusai: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.5 3.5L13 6l-3 2.5.5 3.5L8 10.5 5.5 12l.5-3.5L3 6l3.5-1.5L8 1z"/></svg>',
+  parallelweb: '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="3" width="4" height="10" rx="1"/><rect x="6" y="1" width="4" height="14" rx="1"/><rect x="11" y="4" width="4" height="8" rx="1"/></svg>',
+  astronomer: '<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/><circle cx="12" cy="3" r="1"/></svg>',
+  'drive-api-v3': '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.34 11.5L5.84 3h4.32l-4.5 8.5H1.34zM10.16 3l4.5 8.5h-4.32L5.84 3h4.32zM8 9.5l2.16 4H5.84L8 9.5z"/></svg>',
+  slack: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 1a1.5 1.5 0 00-.15 2.99H7.5V2.5A1.5 1.5 0 006 1zM2.5 6A1.5 1.5 0 001 7.5 1.5 1.5 0 002.5 9h1.49V7.5A1.5 1.5 0 002.5 6zM10 13.01A1.5 1.5 0 0010.15 10H8.5v1.49c0 .84.67 1.52 1.5 1.52zM13.5 10A1.5 1.5 0 0015 8.5 1.5 1.5 0 0013.5 7h-1.49v1.5c0 .83.67 1.5 1.49 1.5zM7.5 13.5V12H6a1.5 1.5 0 000 3c.83 0 1.5-.67 1.5-1.5zM7.5 4h1.49A1.5 1.5 0 007.5 2.5V4zM12 7.5v1.49A1.5 1.5 0 0013.5 7.5H12zM4 8.5V7H2.5A1.5 1.5 0 004 8.5zM8.5 4V2.5A1.5 1.5 0 0110 4v1.49H8.5V4zM6 7h4v2H6V7z"/></svg>',
+};
+
+function adapterIcon(name) {
+  if (ADAPTER_ICONS[name]) return ADAPTER_ICONS[name];
+  // Fallback: generic API icon
+  return '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5a5.5 5.5 0 110 11 5.5 5.5 0 010-11zM7 5v2H5v2h2v2h2V9h2V7H9V5H7z"/></svg>';
+}
+
+function categorizeAdapters(adapters) {
+  const categorized = {};
+  const placed = new Set();
+  for (const [cat, names] of Object.entries(ADAPTER_CATEGORIES)) {
+    const items = adapters.filter(a => names.includes(a.name));
+    if (items.length > 0) {
+      categorized[cat] = items;
+      items.forEach(i => placed.add(i.name));
+    }
+  }
+  const uncategorized = adapters.filter(a => !placed.has(a.name));
+  if (uncategorized.length > 0) {
+    categorized['Other'] = uncategorized;
+  }
+  return categorized;
+}
 
 function renderAdapters(el) {
   if (registryAdapters.length === 0) {
     el.innerHTML = \`
-      <h2>Select APIs</h2>
+      <h2 style="font-weight:300; letter-spacing:-0.5px;">API Catalog</h2>
       <div class="subtitle">Loading available adapters from registry...</div>
       <div style="text-align: center; padding: 40px;"><div class="spinner spinner-lg"></div></div>
     \`;
@@ -1750,29 +2363,60 @@ function renderAdapters(el) {
     }
   }
 
-  let cards = '';
-  for (const a of registryAdapters) {
-    const sel = selectedAdapters.has(a.name) ? 'selected' : '';
-    cards += \`
-      <div class="adapter-card glow-card \${sel}" onclick="toggleAdapter('\${a.name}')">
-        <div class="check">\${sel ? '\\u2713' : ''}</div>
-        <div class="adapter-name">\${a.name}</div>
-        <div class="adapter-desc">\${a.description || ''}</div>
+  // Selection strip
+  let strip = '<div class="selection-strip-label">Selected</div>';
+  if (selectedAdapters.size === 0) {
+    strip = '<div class="selection-strip-label" style="opacity:0.3;">No APIs selected</div>';
+  } else {
+    for (const name of selectedAdapters) {
+      strip += \`<span class="selection-tag" onclick="toggleAdapter('\${name}')">\${name}<span class="tag-x">\\u2715</span></span>\`;
+    }
+  }
+
+  // Categorized sections
+  const cats = categorizeAdapters(registryAdapters);
+  let sections = '';
+  for (const [cat, items] of Object.entries(cats)) {
+    let cards = '';
+    for (const a of items) {
+      const sel = selectedAdapters.has(a.name) ? 'selected' : '';
+      cards += \`
+        <div class="catalog-card glow-card \${sel}" onclick="toggleAdapter('\${a.name}')">
+          <div class="catalog-icon">\${adapterIcon(a.name)}</div>
+          <div class="catalog-body">
+            <div class="catalog-name">\${a.name}</div>
+            <div class="catalog-desc">\${a.description || ''}</div>
+          </div>
+          <div class="catalog-toggle">
+            <svg class="catalog-toggle-check" width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M2 5.5l2 2 4-4" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      \`;
+    }
+    sections += \`
+      <div class="catalog-section">
+        <div class="catalog-section-label">\${cat}</div>
+        <div class="catalog-grid">\${cards}</div>
       </div>
     \`;
   }
 
   el.innerHTML = \`
-    <h2>Select APIs</h2>
-    <div class="subtitle">Choose the APIs you want to connect. You can add more later.</div>
-    <div class="card-grid">\${cards}</div>
-    <div class="btn-row-right">
-      <button class="btn btn-ghost" onclick="selectedAdapters.clear(); renderStep()">Clear all</button>
-      <button class="btn btn-primary" onclick="installSelected()" id="installBtn"
-        \${selectedAdapters.size === 0 ? 'disabled' : ''}>
-        Install \${selectedAdapters.size} adapter\${selectedAdapters.size !== 1 ? 's' : ''} \\u2192
-      </button>
-    </div>
+    <h2 style="font-weight:300; letter-spacing:-0.5px;">API Catalog</h2>
+    <div class="subtitle" style="margin-bottom:16px;">We recommend starting with the defaults below. You can always add more later.</div>
+    <div class="selection-strip" id="selectionStrip">\${strip}</div>
+    \${sections}
+    \${selectedAdapters.size > 0 ? \`
+      <div class="install-bar">
+        <div class="install-count">\${selectedAdapters.size} API\${selectedAdapters.size !== 1 ? 's' : ''} selected</div>
+        <button class="btn btn-ghost" onclick="selectedAdapters.clear(); renderStep()">Clear all</button>
+        <button class="btn btn-primary" onclick="installSelected()" id="installBtn">
+          Install \\u2192
+        </button>
+      </div>
+    \` : ''}
   \`;
 }
 
@@ -1786,29 +2430,41 @@ function installSelected() {
   const adapters = [...selectedAdapters];
   installedAdapters = adapters;
 
-  // Replace the entire step content with the install progress view (in-place)
   const stepEl = document.getElementById('stepContainer');
   if (!stepEl) return;
 
-  let cards = '';
-  for (const a of adapters) {
-    cards += \`
-      <div class="proof-card" id="install-\${a}">
-        <div class="proof-icon"><div class="dot-breathe"></div></div>
-        <div class="proof-info" style="flex:1; min-width:0;">
-          <div class="proof-name">\${a}</div>
-          <div class="proof-status muted">Queued</div>
-          <div class="log-buffer" id="log-\${a}"></div>
+  let items = '';
+  for (let i = 0; i < adapters.length; i++) {
+    const a = adapters[i];
+    items += \`
+      <div class="pipeline-item" id="install-\${a}" style="animation-delay: \${i * 60}ms;">
+        <div class="pipeline-node queued" id="node-\${a}"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">\${adapterIcon(a)}</div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">\${a}</div>
+              <div class="pipeline-status" id="status-\${a}">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="badge-\${a}">Queued</div>
+          </div>
+          <div class="pipeline-log" id="log-\${a}" style="display:none;"></div>
         </div>
       </div>
     \`;
   }
 
   stepEl.innerHTML = \`
-    <h2>Installing APIs</h2>
-    <div class="subtitle">Setting up \${adapters.length} adapter\${adapters.length !== 1 ? 's' : ''}. This may take a moment.</div>
-    <div class="install-counter" id="installCounter">0 / \${adapters.length} complete</div>
-    <div class="card-list" id="installList">\${cards}</div>
+    <h2 style="font-weight:300; letter-spacing:-0.5px;">Installing</h2>
+    <div class="subtitle">Connecting \${adapters.length} API\${adapters.length !== 1 ? 's' : ''} to your workspace.</div>
+    <div class="pipeline-progress-wrap">
+      <div class="pipeline-progress-label">
+        <span class="pipeline-progress-text" id="progressText">0 of \${adapters.length} complete</span>
+        <span class="pipeline-progress-pct" id="progressPct">0%</span>
+      </div>
+      <div class="pipeline-track"><div class="pipeline-fill" id="progressFill" style="width: 0%;"></div></div>
+    </div>
+    <div class="install-pipeline" id="installPipeline">\${items}</div>
     <div id="installDoneRow"></div>
   \`;
 
@@ -1816,55 +2472,65 @@ function installSelected() {
 }
 
 function handleInstallProgress(msg) {
-  const card = document.getElementById('install-' + msg.adapter);
-  if (!card) return;
+  const item = document.getElementById('install-' + msg.adapter);
+  if (!item) return;
 
+  const node = document.getElementById('node-' + msg.adapter);
+  const badge = document.getElementById('badge-' + msg.adapter);
+  const status = document.getElementById('status-' + msg.adapter);
   const logEl = document.getElementById('log-' + msg.adapter);
-  const statusEl = card.querySelector('.proof-status');
+  const checkSvg = '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const xSvg = '<svg viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>';
 
   if (msg.status === 'installing') {
-    // Mark card as active — scroll into view
-    card.classList.add('active');
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    item.className = 'pipeline-item active';
+    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    // Show breathing dot
-    card.querySelector('.proof-icon').innerHTML = '<div class="dot-breathe"></div>';
+    if (node) { node.className = 'pipeline-node active'; node.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="3" fill="#fff"/></svg>'; }
+    if (badge) { badge.className = 'pipeline-badge active'; badge.textContent = 'Installing'; }
+    if (status) status.textContent = msg.message;
 
-    // Update status text
-    if (statusEl) statusEl.textContent = msg.message;
-
-    // Stream log lines into the log buffer
     if (logEl && msg.logs && msg.logs.length > 0) {
-      logEl.style.display = 'block';
+      logEl.style.display = '';
       logEl.innerHTML = msg.logs.map(l => '<div class="log-line">' + escapeHtml(l) + '</div>').join('')
-        + '<div class="log-line log-cursor">\\u258A</div>';
+        + '<span class="log-cursor">\\u258A</span>';
     }
   } else if (msg.status === 'success') {
-    card.classList.remove('active');
-    card.className = 'proof-card success';
-    card.querySelector('.proof-icon').innerHTML = '<span class="text-success" style="font-size:18px;">\\u2713</span>';
-    if (statusEl) { statusEl.textContent = msg.message; statusEl.classList.remove('muted'); statusEl.classList.add('text-success'); }
-    if (logEl) { logEl.style.display = 'none'; }
+    item.className = 'pipeline-item success';
+    if (node) { node.className = 'pipeline-node success'; node.innerHTML = checkSvg; }
+    if (badge) { badge.className = 'pipeline-badge success'; badge.textContent = msg.message; }
+    if (status) status.textContent = 'Complete';
+    if (logEl) logEl.style.display = 'none';
   } else if (msg.status === 'error') {
-    card.classList.remove('active');
-    card.className = 'proof-card error';
-    card.querySelector('.proof-icon').innerHTML = '<span class="text-error" style="font-size:18px;">\\u2717</span>';
-    if (statusEl) { statusEl.textContent = msg.message; statusEl.classList.remove('muted'); statusEl.classList.add('text-error'); }
-    if (logEl) logEl.classList.add('errored');
+    item.className = 'pipeline-item error';
+    if (node) { node.className = 'pipeline-node error'; node.innerHTML = xSvg; }
+    if (badge) { badge.className = 'pipeline-badge error'; badge.textContent = 'Failed'; }
+    if (status) status.textContent = msg.message;
   }
 
-  // Update counter
-  const allCards = document.querySelectorAll('[id^="install-"]');
-  const doneCount = [...allCards].filter(c => c.classList.contains('success') || c.classList.contains('error')).length;
-  const counter = document.getElementById('installCounter');
-  if (counter) counter.textContent = doneCount + ' / ' + allCards.length + ' complete';
+  // Update progress
+  const total = installedAdapters.length;
+  const allItems = document.querySelectorAll('[id^="install-"]');
+  const doneCount = [...allItems].filter(el => el.classList.contains('success') || el.classList.contains('error')).length;
+  const pct = Math.round((doneCount / total) * 100);
 
-  const allDone = doneCount === allCards.length;
-  if (allDone) {
-    if (counter) counter.classList.add('text-success');
+  const fill = document.getElementById('progressFill');
+  const pctEl = document.getElementById('progressPct');
+  const textEl = document.getElementById('progressText');
+  if (fill) fill.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  if (textEl) textEl.textContent = doneCount + ' of ' + total + ' complete';
+
+  if (doneCount === total) {
+    if (fill) { fill.classList.add('done'); fill.style.width = '100%'; }
+    if (pctEl) pctEl.classList.add('done');
+    if (textEl) { textEl.classList.add('done'); textEl.textContent = 'All ' + total + ' APIs connected'; }
+    const pipeline = document.getElementById('installPipeline');
+    if (pipeline) pipeline.classList.add('all-done');
+
     const doneRow = document.getElementById('installDoneRow');
     if (doneRow) {
-      doneRow.innerHTML = '<div class="btn-row-right" style="margin-top:24px;"><button class="btn btn-primary" onclick="next()">Continue \\u2192</button></div>';
+      doneRow.innerHTML = '<div class="btn-row-right" style="margin-top:28px;"><button class="btn btn-primary" onclick="next()">Continue \\u2192</button></div>';
     }
   }
 }
@@ -2067,15 +2733,13 @@ function handleVaultPullStatus(msg) {
       if (btn) { btn.textContent = 'Pulled'; btn.disabled = true; btn.classList.add('btn-success-done'); }
     }
     statusEl.innerHTML = \`
-      <div class="vault-status-banner success">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0;">
-          <circle cx="9" cy="9" r="8" stroke="var(--success)" stroke-width="1.5" fill="none"/>
-          <path d="M5.5 9.5l2 2 5-5" stroke="var(--success)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="vault-status-banner success" style="flex-direction:column; align-items:center; text-align:center;">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="9" stroke="var(--success)" stroke-width="1.5" fill="none"/>
+          <path d="M6 10.5l2.5 2.5 5.5-5.5" stroke="var(--success)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <div>
-          <div class="vault-status-title">\${escapeHtml(msg.message)}</div>
-          <div class="vault-status-hint muted">Tokens below have been updated from the vault.</div>
-        </div>
+        <div class="vault-status-title" style="margin-top:6px;">\${escapeHtml(msg.message)}</div>
+        <div class="vault-status-hint muted">Tokens below have been updated from the vault.</div>
       </div>
     \`;
   } else {
@@ -2161,49 +2825,46 @@ function renderWire(el) {
     const sel = selectedWireClients.has(c.id) ? 'selected' : '';
     cards += \`
       <div class="wire-card glow-card \${sel}" onclick="toggleWire('\${c.id}')">
-        <div class="wire-icon">\\u{2B21}</div>
+        <div class="wire-toggle">
+          <svg class="wire-toggle-check" width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5.5l2 2 4-4" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="wire-brand">\${c.icon}</div>
         <div class="wire-info">
           <div class="wire-name">\${c.name}</div>
           <div class="wire-desc">\${c.desc}</div>
         </div>
-        <div class="wire-check">\${sel ? '\\u2713' : ''}</div>
       </div>
     \`;
   }
 
   const stdioServers = [
-    { name: 'Playwright (headed)', desc: 'Browser automation \\u2014 visible Chrome window' },
-    { name: 'Playwright (headless)', desc: 'Browser automation \\u2014 invisible, for CI/scripts' },
-    { name: 'Chrome DevTools (headed)', desc: 'Chrome DevTools protocol \\u2014 visible' },
-    { name: 'Chrome DevTools (headless)', desc: 'Chrome DevTools protocol \\u2014 headless' },
-    { name: 'Filesystem', desc: 'Read/write files in /tmp sandbox' },
+    { name: 'Playwright', desc: 'Browser automation' },
+    { name: 'Chrome DevTools', desc: 'DevTools protocol' },
+    { name: 'Filesystem', desc: 'Sandboxed file access' },
   ];
-  let stdioHtml = stdioServers.map(s => \`
-    <div style="display:flex; align-items:center; gap:10px; padding:5px 0;">
-      <span class="text-success" style="font-size:12px; flex-shrink:0;">\\u2713</span>
-      <div>
-        <div style="font-size:12px; font-weight:500;">\${s.name}</div>
-        <div class="muted" style="font-size:11px;">\${s.desc}</div>
-      </div>
+  let mcpItems = stdioServers.map(s => \`
+    <div class="mcp-item">
+      <div class="mcp-dot"></div>
+      <span class="mcp-item-name">\${s.name}</span>
+      <span class="mcp-item-desc">\${s.desc}</span>
     </div>
   \`).join('');
 
   el.innerHTML = \`
-    <h2>Wire AI Tools</h2>
-    <div class="subtitle">Install dex skills into your preferred AI coding tools.</div>
-    <div class="card-list">\${cards}</div>
-    <div style="margin-top: 24px;">
-      <div class="section-title">Included: Standard MCP Bundle</div>
-      <div class="card" style="border-image: linear-gradient(135deg, rgba(var(--glow-color),0.3), var(--card-border), rgba(var(--glow-color),0.3)) 1;">
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-          <div style="font-size:18px; opacity:0.7;">\\u{2B21}</div>
-          <div>
-            <div style="font-weight:500;">Stdio MCP Servers</div>
-            <div class="muted" style="font-size:11px;">Auto-configured \\u2014 browser automation, DevTools, and filesystem access.</div>
-          </div>
+    <h2 style="font-weight:300; letter-spacing:-0.5px;">Wire AI Tools</h2>
+    <div class="subtitle" style="margin-bottom:20px;">Connect dex to your AI coding tools via MCP.</div>
+    <div class="wire-grid">\${cards}</div>
+    <div class="mcp-bundle">
+      <div class="mcp-bundle-header">
+        <div>
+          <div class="mcp-bundle-title">MCP Server Bundle</div>
+          <div class="mcp-bundle-sub">Auto-configured with every installation</div>
         </div>
-        <div style="border-top:1px solid var(--card-border); padding-top:8px;">\${stdioHtml}</div>
+        <div class="mcp-bundle-label">Included</div>
       </div>
+      \${mcpItems}
     </div>
     <div class="btn-row-right" id="wireActions">
       <button class="btn btn-ghost" onclick="next()">Skip</button>
@@ -2223,44 +2884,92 @@ function toggleWire(id) {
 
 function wireSelected() {
   const clients = [...selectedWireClients];
-  const actions = document.getElementById('wireActions');
-  if (actions) actions.style.display = 'none';
+  const stepEl = document.getElementById('stepContainer');
+  if (!stepEl) return;
 
-  const statusEl = document.getElementById('wireStatus');
-  statusEl.innerHTML = '<div class="spacer"></div><div class="section-title">Wiring</div><div class="card-list" id="wireList"></div>';
-
-  const list = document.getElementById('wireList');
-  for (const c of clients) {
+  let items = '';
+  for (let i = 0; i < clients.length; i++) {
+    const c = clients[i];
     const def = WIRE_CLIENTS.find(w => w.id === c);
-    list.innerHTML += \`
-      <div class="proof-card" id="wire-\${c}">
-        <div class="proof-icon"><div class="dot-breathe"></div></div>
-        <div class="proof-info">
-          <div class="proof-name">\${def ? def.name : c}</div>
-          <div class="proof-output">Wiring...</div>
+    items += \`
+      <div class="pipeline-item" id="wire-\${c}" style="animation-delay: \${i * 60}ms;">
+        <div class="pipeline-node queued" id="wnode-\${c}"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">\${def ? def.icon : ''}</div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">\${def ? def.name : c}</div>
+              <div class="pipeline-status" id="wstatus-\${c}">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="wbadge-\${c}">Queued</div>
+          </div>
         </div>
       </div>
     \`;
   }
+
+  stepEl.innerHTML = \`
+    <h2 style="font-weight:300; letter-spacing:-0.5px;">Wiring</h2>
+    <div class="subtitle">Connecting MCP tools to your AI environment.</div>
+    <div class="pipeline-progress-wrap">
+      <div class="pipeline-progress-label">
+        <span class="pipeline-progress-text" id="wireProgressText">0 of \${clients.length} wired</span>
+        <span class="pipeline-progress-pct" id="wireProgressPct">0%</span>
+      </div>
+      <div class="pipeline-track"><div class="pipeline-fill" id="wireProgressFill" style="width:0%;"></div></div>
+    </div>
+    <div class="install-pipeline" id="wirePipeline">\${items}</div>
+    <div id="wireDoneRow"></div>
+  \`;
+
   vscode.postMessage({ type: 'wire-clients', clients });
 }
 
 function handleWireProgress(msg) {
-  const card = document.getElementById('wire-' + msg.client);
-  if (!card) return;
+  const item = document.getElementById('wire-' + msg.client);
+  if (!item) return;
+
+  const node = document.getElementById('wnode-' + msg.client);
+  const badge = document.getElementById('wbadge-' + msg.client);
+  const status = document.getElementById('wstatus-' + msg.client);
+  const checkSvg = '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const xSvg = '<svg viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>';
+
   if (msg.status === 'success') {
-    card.className = 'proof-card success';
-    card.querySelector('.proof-icon').innerHTML = '<span class="text-success">\\u2713</span>';
-    card.querySelector('.proof-output').textContent = 'Connected';
+    item.className = 'pipeline-item success';
+    if (node) { node.className = 'pipeline-node success'; node.innerHTML = checkSvg; }
+    if (badge) { badge.className = 'pipeline-badge success'; badge.textContent = 'Connected'; }
+    if (status) status.textContent = 'Complete';
   } else if (msg.status === 'error') {
-    card.className = 'proof-card error';
-    card.querySelector('.proof-icon').innerHTML = '<span class="text-error">\\u2717</span>';
-    card.querySelector('.proof-output').textContent = 'Failed';
+    item.className = 'pipeline-item error';
+    if (node) { node.className = 'pipeline-node error'; node.innerHTML = xSvg; }
+    if (badge) { badge.className = 'pipeline-badge error'; badge.textContent = 'Failed'; }
+    if (status) status.textContent = msg.message || 'Error';
   }
-  const allCards = document.querySelectorAll('[id^="wire-"]');
-  const allDone = [...allCards].every(c => c.classList.contains('success') || c.classList.contains('error'));
-  if (allDone) {
-    document.getElementById('wireStatus').innerHTML += '<div class="btn-row-right"><button class="btn btn-primary" onclick="next()">Continue \\u2192</button></div>';
+
+  // Update progress
+  const total = [...selectedWireClients].length;
+  const allItems = document.querySelectorAll('[id^="wire-"]');
+  const doneCount = [...allItems].filter(el => el.classList.contains('success') || el.classList.contains('error')).length;
+  const pct = Math.round((doneCount / total) * 100);
+
+  const fill = document.getElementById('wireProgressFill');
+  const pctEl = document.getElementById('wireProgressPct');
+  const textEl = document.getElementById('wireProgressText');
+  if (fill) fill.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  if (textEl) textEl.textContent = doneCount + ' of ' + total + ' wired';
+
+  if (doneCount === total) {
+    if (fill) { fill.classList.add('done'); fill.style.width = '100%'; }
+    if (pctEl) pctEl.classList.add('done');
+    if (textEl) { textEl.classList.add('done'); textEl.textContent = 'All tools connected'; }
+    const pipeline = document.getElementById('wirePipeline');
+    if (pipeline) pipeline.classList.add('all-done');
+    const doneRow = document.getElementById('wireDoneRow');
+    if (doneRow) {
+      doneRow.innerHTML = '<div class="btn-row-right" style="margin-top:28px;"><button class="btn btn-primary" onclick="next()">Continue \\u2192</button></div>';
+    }
   }
 }
 
@@ -2383,28 +3092,62 @@ function renderComplete(el) {
   const tokenCount = tokenRequirements.filter(t => t.configured).length;
   const wireCount = selectedWireClients.size;
 
+  const claudeIcon = WIRE_CLIENTS.find(w => w.id === 'dex-skill-claude-code')?.icon || '';
+  const codexIcon = WIRE_CLIENTS.find(w => w.id === 'dex-skill-codex')?.icon || '';
+  const agentsIcon = WIRE_CLIENTS.find(w => w.id === 'dex-agents-md')?.icon || '';
+
   el.innerHTML = \`
     <div class="complete-hero">
-      <div class="complete-logo">\${buildStippleSvg(48)}</div>
+      <div class="complete-logo">\${buildStippleSvg(40)}</div>
       <h1>You're all set</h1>
-      <div class="subtitle">modiqo dex is configured and ready to go.</div>
+      <div class="subtitle">modiq<span style="display:inline-block; width:0.52em; height:0.52em; background:#E87A2A; border-radius:50%; vertical-align:baseline; margin:0 0.01em; position:relative; top:-0.05em;"></span> dex is configured and ready to use.</div>
     </div>
-    <div class="summary-grid">
-      <div class="summary-card">
-        <div class="summary-number">\${adapterCount}</div>
-        <div class="summary-label">Adapters installed</div>
+    <div class="summary-row">
+      <div class="summary-stat">
+        <div class="summary-stat-num">\${adapterCount}</div>
+        <div class="summary-stat-label">APIs</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-number">\${tokenCount}</div>
-        <div class="summary-label">Tokens configured</div>
+      <div class="summary-stat">
+        <div class="summary-stat-num">\${tokenCount}</div>
+        <div class="summary-stat-label">Tokens</div>
       </div>
-      <div class="summary-card">
-        <div class="summary-number">\${wireCount}</div>
-        <div class="summary-label">Tools wired</div>
+      <div class="summary-stat">
+        <div class="summary-stat-num">\${wireCount}</div>
+        <div class="summary-stat-label">Tools</div>
       </div>
     </div>
-    <div style="text-align: center;">
-      <button class="btn btn-primary" onclick="finishSetup()">Open dex \\u2192</button>
+
+    <div class="try-section-label">Try it now</div>
+
+    <div class="try-card">
+      <div class="try-icon">\${claudeIcon}</div>
+      <div class="try-body">
+        <div class="try-tool">Claude Code <span class="try-tool-badge">MCP</span></div>
+        <div class="try-prompt"><span class="cmd">/dex</span> <span class="query">fetch my recent emails from the last 10 days</span></div>
+        <div class="try-desc">Invoke dex as a slash command. Claude will use your connected APIs automatically.</div>
+      </div>
+    </div>
+
+    <div class="try-card">
+      <div class="try-icon">\${codexIcon}</div>
+      <div class="try-body">
+        <div class="try-tool">Codex <span class="try-tool-badge">CLI</span></div>
+        <div class="try-prompt"><span class="cmd">$dex</span> <span class="query">fetch my rideshare receipts for February 2026</span></div>
+        <div class="try-desc">Prefix with $dex in Codex CLI. Dex resolves the right API, auth, and returns structured data.</div>
+      </div>
+    </div>
+
+    <div class="try-card">
+      <div class="try-icon">\${agentsIcon}</div>
+      <div class="try-body">
+        <div class="try-tool">Any AI Tool <span class="try-tool-badge">AGENTS.md</span></div>
+        <div class="try-prompt"><span class="query">learn how to use dex and dex browse to fetch the latest hacker news updates</span></div>
+        <div class="try-desc">Any tool that reads AGENTS.md will discover dex capabilities and invoke them on your behalf.</div>
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-top:28px;">
+      <button class="btn btn-primary" onclick="finishSetup()">Start using dex \\u2192</button>
     </div>
   \`;
 }
@@ -2417,3 +3160,215 @@ function finishSetup() {
 
 renderStep();
 `;
+
+// ── Install Panel (standalone dex binary install) ──────────
+
+let currentInstallPanel: vscode.WebviewPanel | undefined;
+
+export function showInstallPanel(
+  extensionUri: vscode.Uri,
+  onComplete: () => void,
+): vscode.WebviewPanel {
+  if (currentInstallPanel) {
+    currentInstallPanel.reveal();
+    return currentInstallPanel;
+  }
+
+  const panel = vscode.window.createWebviewPanel(
+    "modiqo.installDex",
+    "Install dex",
+    vscode.ViewColumn.One,
+    { enableScripts: true, retainContextWhenHidden: true },
+  );
+
+  currentInstallPanel = panel;
+  panel.onDidDispose(() => { currentInstallPanel = undefined; });
+
+  panel.webview.html = buildInstallHtml();
+
+  panel.webview.onDidReceiveMessage((msg) => {
+    if (msg.type === "install-complete") {
+      onComplete();
+      panel.dispose();
+    }
+  });
+
+  return panel;
+}
+
+function buildInstallHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+${CSS}
+.install-page { max-width: 560px; margin: 0 auto; padding: 48px 24px; }
+</style>
+</head>
+<body>
+  <div class="install-page" id="installPage">
+    <div class="complete-hero">
+      <h1 style="color: var(--fg); font-weight: 300; letter-spacing: -0.5px;">Installing modiq<span style="display:inline-block; width:0.52em; height:0.52em; background:#E87A2A; border-radius:50%; vertical-align:baseline; margin:0 0.01em; position:relative; top:-0.05em;"></span> dex</h1>
+      <div class="subtitle">Setting up the runtime, SDK, and toolchain.</div>
+    </div>
+    <div class="pipeline-progress-wrap" style="margin-top:32px;">
+      <div class="pipeline-progress-label">
+        <span class="pipeline-progress-text" id="progressText">Starting</span>
+        <span class="pipeline-progress-pct" id="progressPct">0%</span>
+      </div>
+      <div class="pipeline-track"><div class="pipeline-fill" id="progressFill" style="width:0%;"></div></div>
+    </div>
+    <div class="install-pipeline" id="installPipeline" style="margin-top:24px;">
+      <div class="pipeline-item" id="step-download">
+        <div class="pipeline-node active" id="node-download">
+          <svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="3" fill="#fff"/></svg>
+        </div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v8.59L5.71 7.29 4.29 8.71l3 3a1 1 0 001.42 0l3-3-1.42-1.42L8 9.59V1H8zM3 13v1h10v-1H3z"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">Download</div>
+              <div class="pipeline-status" id="status-download">Downloading installer...</div>
+            </div>
+            <div class="pipeline-badge active" id="badge-download">Running</div>
+          </div>
+        </div>
+      </div>
+      <div class="pipeline-item" id="step-binary">
+        <div class="pipeline-node queued" id="node-binary"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 1h6l3 3v9a2 2 0 01-2 2H4a2 2 0 01-2-2V3a2 2 0 012-2h1zm5 1.5V5h2.5L10 2.5zM6 8h4v1H6V8zm0 2h4v1H6v-1z"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">dex Binary</div>
+              <div class="pipeline-status" id="status-binary">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="badge-binary">Queued</div>
+          </div>
+        </div>
+      </div>
+      <div class="pipeline-item" id="step-deno">
+        <div class="pipeline-node queued" id="node-deno"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5a5.5 5.5 0 110 11 5.5 5.5 0 010-11z"/><circle cx="8" cy="6" r="1.5"/><path d="M8 8.5v3"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">Deno Runtime</div>
+              <div class="pipeline-status" id="status-deno">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="badge-deno">Queued</div>
+          </div>
+        </div>
+      </div>
+      <div class="pipeline-item" id="step-sdk">
+        <div class="pipeline-node queued" id="node-sdk"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2L1 5.5 4.5 9l1-1L3 5.5 5.5 3l-1-1zm7 0l-1 1L13 5.5 10.5 8l1 1L15 5.5 11.5 2zM6 12l2-10h1.5l-2 10H6z"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">TypeScript SDK</div>
+              <div class="pipeline-status" id="status-sdk">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="badge-sdk">Queued</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="installDoneRow"></div>
+  </div>
+  <script>
+    const vscode = acquireVsCodeApi();
+    const STEPS = ['download', 'binary', 'deno', 'sdk'];
+    const checkSvg = '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function activateStep(id) {
+      const item = document.getElementById('step-' + id);
+      const node = document.getElementById('node-' + id);
+      const badge = document.getElementById('badge-' + id);
+      const status = document.getElementById('status-' + id);
+      if (item) item.classList.add('active');
+      if (node) { node.className = 'pipeline-node active'; node.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="3" fill="#fff"/></svg>'; }
+      if (badge) { badge.className = 'pipeline-badge active'; badge.textContent = 'Running'; }
+      if (status) status.textContent = 'Installing...';
+    }
+
+    function completeStep(id) {
+      const item = document.getElementById('step-' + id);
+      const node = document.getElementById('node-' + id);
+      const badge = document.getElementById('badge-' + id);
+      const status = document.getElementById('status-' + id);
+      if (item) { item.classList.remove('active'); item.classList.add('success'); }
+      if (node) { node.className = 'pipeline-node success'; node.innerHTML = checkSvg; }
+      if (badge) { badge.className = 'pipeline-badge success'; badge.textContent = 'Done'; }
+      if (status) status.textContent = 'Complete';
+    }
+
+    function failStep(id, msg) {
+      const item = document.getElementById('step-' + id);
+      const node = document.getElementById('node-' + id);
+      const badge = document.getElementById('badge-' + id);
+      const status = document.getElementById('status-' + id);
+      if (item) { item.classList.remove('active'); item.classList.add('error'); }
+      if (node) { node.className = 'pipeline-node error'; node.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>'; }
+      if (badge) { badge.className = 'pipeline-badge error'; badge.textContent = 'Failed'; }
+      if (status) status.textContent = msg || 'Error';
+    }
+
+    function updateProgress(done, total) {
+      const pct = Math.round((done / total) * 100);
+      const fill = document.getElementById('progressFill');
+      const pctEl = document.getElementById('progressPct');
+      const textEl = document.getElementById('progressText');
+      if (fill) fill.style.width = pct + '%';
+      if (pctEl) pctEl.textContent = pct + '%';
+      if (textEl) textEl.textContent = done + ' of ' + total + ' complete';
+    }
+
+    window.addEventListener('message', (e) => {
+      const msg = e.data;
+      if (msg.type === 'install-step') {
+        activateStep(msg.step);
+        // Complete previous steps
+        const idx = STEPS.indexOf(msg.step);
+        for (let i = 0; i < idx; i++) completeStep(STEPS[i]);
+        updateProgress(idx, STEPS.length);
+      } else if (msg.type === 'install-done') {
+        STEPS.forEach(s => completeStep(s));
+        updateProgress(STEPS.length, STEPS.length);
+        const fill = document.getElementById('progressFill');
+        const pctEl = document.getElementById('progressPct');
+        const textEl = document.getElementById('progressText');
+        if (fill) fill.classList.add('done');
+        if (pctEl) pctEl.classList.add('done');
+        if (textEl) { textEl.classList.add('done'); textEl.textContent = 'Installation complete'; }
+        const pipeline = document.getElementById('installPipeline');
+        if (pipeline) pipeline.classList.add('all-done');
+        const done = document.getElementById('installDoneRow');
+        if (done) {
+          done.innerHTML = '<div style="text-align:center; margin-top:28px;"><button class="btn btn-primary" onclick="vscode.postMessage({type:\\'install-complete\\'})">Begin Setup \\u2192</button></div>';
+        }
+      } else if (msg.type === 'install-error') {
+        failStep(msg.step || 'download', msg.message);
+        const textEl = document.getElementById('progressText');
+        if (textEl) { textEl.textContent = 'Installation failed'; textEl.style.color = 'var(--error)'; }
+        const done = document.getElementById('installDoneRow');
+        if (done) {
+          done.innerHTML = '<div style="text-align:center; margin-top:28px;"><div class="muted" style="margin-bottom:8px;">Try running manually:</div><div class="try-prompt" style="display:inline-block;"><code>curl -fsSL https://raw.githubusercontent.com/modiqo/dex-releases/main/install.sh | bash</code></div></div>';
+        }
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
