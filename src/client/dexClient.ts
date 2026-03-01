@@ -46,6 +46,15 @@ export interface TokenInfo {
   configured: boolean;
 }
 
+export interface VaultToken {
+  name: string;
+  type: string;
+  expires_in: string;
+  refresh: string;
+  created: string;
+  description: string;
+}
+
 export interface RegistryWhoami {
   status: "valid" | "expired" | "error";
   email: string;
@@ -355,6 +364,36 @@ export class DexClient {
     } catch {
       return [];
     }
+  }
+
+  /** Get vault tokens — parses the table output of `dex token list` */
+  async vaultTokenList(): Promise<VaultToken[]> {
+    try {
+      const text = await this.execText(["token", "list"]);
+      return this.parseVaultTokenTable(text);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Pull vault from registry with passphrase.
+   *  Uses DEX_VAULT_PASSPHRASE env var for headless mode. */
+  async vaultPull(passphrase: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const child = spawn(this.dexPath, ["vault", "pull"], {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env, DEX_VAULT_PASSPHRASE: passphrase },
+      });
+
+      child.on("close", (code) => resolve(code === 0));
+      child.on("error", () => resolve(false));
+
+      // Safety timeout
+      setTimeout(() => {
+        child.kill();
+        resolve(false);
+      }, 30000);
+    });
   }
 
   /** Get adapter catalog categories */
@@ -815,6 +854,59 @@ export class DexClient {
             status.includes("\u2713") || status.includes("configured"),
         });
       }
+    }
+
+    return tokens;
+  }
+
+  /** Parse `dex token list` table with │-delimited columns:
+   *  Name | Type | Expires In | Refresh | Created | Description */
+  private parseVaultTokenTable(text: string): VaultToken[] {
+    const tokens: VaultToken[] = [];
+    const lines = text.split("\n");
+
+    for (const line of lines) {
+      // Skip borders (┌─┬─┐, ├─┼─┤, └─┴─┘), headers, status/result sections
+      if (
+        !line.includes("│") ||
+        line.includes("Name") && line.includes("Type") && line.includes("Expires")
+      ) {
+        continue;
+      }
+
+      const cells = line
+        .split("│")
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0);
+
+      if (cells.length < 2) {
+        continue;
+      }
+
+      // A data row has a name in the first cell (non-empty, not a continuation line)
+      const name = cells[0];
+      if (!name || name.startsWith("(")) {
+        // Continuation line like "(auto-refreshed)" — append to previous description
+        if (tokens.length > 0 && cells.length >= 1) {
+          const prev = tokens[tokens.length - 1];
+          const extra = cells.join(" ").trim();
+          if (extra) {
+            prev.description = prev.description === "-"
+              ? extra
+              : `${prev.description} ${extra}`;
+          }
+        }
+        continue;
+      }
+
+      tokens.push({
+        name,
+        type: cells[1] || "-",
+        expires_in: cells[2] || "-",
+        refresh: cells[3] || "-",
+        created: cells[4] || "-",
+        description: cells[5] || "-",
+      });
     }
 
     return tokens;

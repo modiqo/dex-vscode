@@ -57,6 +57,11 @@
           "type": "tree"
         },
         {
+          "id": "modiqo-vault",
+          "name": "Vault",
+          "type": "tree"
+        },
+        {
           "id": "modiqo-explore",
           "name": "Explore",
           "type": "tree"
@@ -156,6 +161,18 @@
         "icon": "$(graph)"
       },
       {
+        "command": "modiqo.refreshVault",
+        "title": "Refresh Vault",
+        "category": "modiqo",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "modiqo.vaultPull",
+        "title": "Pull Vault",
+        "category": "modiqo",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "modiqo.refreshExplore",
         "title": "Refresh Explore",
         "category": "modiqo",
@@ -204,6 +221,16 @@
         {
           "command": "modiqo.showRegistryOverview",
           "when": "view == modiqo-registry",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.refreshVault",
+          "when": "view == modiqo-vault",
+          "group": "navigation"
+        },
+        {
+          "command": "modiqo.vaultPull",
+          "when": "view == modiqo-vault",
           "group": "navigation"
         },
         {

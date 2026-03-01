@@ -20,6 +20,7 @@ import {
   showRegistryOverviewPanel,
 } from "./panels/registryPanel";
 import { ExploreTreeProvider } from "./views/exploreTree";
+import { VaultTreeProvider } from "./views/vaultTree";
 import { InfoTreeProvider } from "./views/infoTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
 import { showReferencePanel } from "./panels/referencePanel";
@@ -40,6 +41,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registryTree.setExtensionUri(context.extensionUri);
   const exploreTree = new ExploreTreeProvider(client);
   exploreTree.setExtensionUri(context.extensionUri);
+  const vaultTree = new VaultTreeProvider(client);
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("modiqo-info", infoTree),
@@ -47,6 +49,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerTreeDataProvider("modiqo-flows", flowTree),
     vscode.window.registerTreeDataProvider("modiqo-workspaces", workspaceTree),
     vscode.window.registerTreeDataProvider("modiqo-registry", registryTree),
+    vscode.window.registerTreeDataProvider("modiqo-vault", vaultTree),
     vscode.window.registerTreeDataProvider("modiqo-explore", exploreTree)
   );
 
@@ -63,6 +66,7 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     onTokensChanged: () => {
       adapterTree.refresh();
+      vaultTree.refresh();
       statusBar.refresh();
     },
     onFlowsChanged: () => {
@@ -209,6 +213,33 @@ export function activate(context: vscode.ExtensionContext): void {
           showRegistryOverviewPanel(context.extensionUri, adapters, skills);
         }
       );
+    }),
+    vscode.commands.registerCommand("modiqo.refreshVault", () => {
+      vaultTree.refresh();
+    }),
+    vscode.commands.registerCommand("modiqo.vaultPull", async () => {
+      const passphrase = await vscode.window.showInputBox({
+        prompt: "Enter vault passphrase",
+        placeHolder: "Passphrase for encrypted vault",
+        password: true,
+      });
+      if (!passphrase) { return; }
+
+      const success = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Pulling vault...",
+          cancellable: false,
+        },
+        () => client.vaultPull(passphrase),
+      );
+
+      if (success) {
+        vaultTree.refresh();
+        vscode.window.showInformationMessage("Vault pulled successfully.");
+      } else {
+        vscode.window.showErrorMessage("Vault pull failed. Check passphrase and try again.");
+      }
     }),
     vscode.commands.registerCommand("modiqo.refreshExplore", () => {
       exploreTree.refresh();
