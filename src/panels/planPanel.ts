@@ -209,6 +209,28 @@ function buildPlanData(
     }
   }
 
+  // Probe→call dependency: {adapter}_probe must precede {adapter}_call
+  // Mirrors the Rust plan.rs "sixth pass" logic
+  const toolCallNodes = nodes
+    .filter(n => !n.isInit && n.toolName !== n.endpoint)
+    .map(n => ({ rid: n.responseId, endpoint: n.endpoint, toolName: n.toolName }));
+
+  for (let i = 0; i < toolCallNodes.length; i++) {
+    const probe = toolCallNodes[i];
+    if (!probe.toolName.endsWith("_probe")) { continue; }
+    const prefix = probe.toolName.slice(0, -"_probe".length);
+    const callSuffix = `${prefix}_call`;
+    for (let j = i + 1; j < toolCallNodes.length; j++) {
+      const call = toolCallNodes[j];
+      if (call.endpoint === probe.endpoint && call.toolName === callSuffix) {
+        const callNode = nodeMap.get(call.rid);
+        if (callNode && !callNode.dependencies.includes(probe.rid)) {
+          callNode.dependencies.push(probe.rid);
+        }
+      }
+    }
+  }
+
   const levels = topoSortLevels(nodes, nodeMap);
   const totalSequentialMs = nodes.reduce((s, n) => s + n.durationMs, 0);
   const totalParallelMs = levels.reduce((s, l) => s + l.maxDurationMs, 0);

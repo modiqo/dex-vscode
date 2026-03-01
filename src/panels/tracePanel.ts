@@ -623,9 +623,15 @@ function buildTraceHtml(
 
     const ROW_H = 36;
     const THINK_H = 22;
+    const SESSION_H = 20;
     const rows = [];
     data.forEach((bar, i) => {
       rows.push({ type: 'bar', bar: bar, idx: i });
+      // Add session indicator for initialize/tools_list calls
+      const isSession = bar.method === 'initialize' || bar.method.includes('initialize') || bar.method === 'tools/list';
+      if (isSession) {
+        rows.push({ type: 'session', bar: bar, idx: i });
+      }
       if (bar.thinking && bar.thinking.length > 0) {
         bar.thinking.forEach(t => {
           rows.push({ type: 'think', bar: bar, think: t, idx: i });
@@ -706,7 +712,7 @@ function buildTraceHtml(
         bottom: 32,
         left: Math.min(Math.max(containerWidth * 0.2, 120), 200)
       };
-      const totalHeight = rows.reduce((s, r) => s + (r.type === 'bar' ? ROW_H : THINK_H), 0);
+      const totalHeight = rows.reduce((s, r) => s + (r.type === 'bar' ? ROW_H : r.type === 'session' ? SESSION_H : THINK_H), 0);
       const width = containerWidth - margin.left - margin.right;
       const height = totalHeight;
 
@@ -850,6 +856,25 @@ function buildTraceHtml(
           }
 
           yPos += ROW_H;
+
+        } else if (row.type === 'session') {
+          const sG = g.append('g').attr('transform', 'translate(0,' + yPos + ')');
+
+          sG.append('line')
+            .attr('x1', -margin.left).attr('x2', containerWidth - margin.left)
+            .attr('y1', SESSION_H).attr('y2', SESSION_H)
+            .attr('stroke', borderColor).attr('stroke-opacity', 0.08);
+
+          sG.append('text')
+            .attr('x', 4).attr('y', SESSION_H / 2)
+            .attr('dominant-baseline', 'central')
+            .attr('font-size', '10px')
+            .attr('font-family', cs.getPropertyValue('--mono').trim() || 'monospace')
+            .attr('fill', successColor)
+            .attr('opacity', 0.8)
+            .text('\u21B3 session established \u2014 used by subsequent calls');
+
+          yPos += SESSION_H;
 
         } else {
           const t = row.think;
