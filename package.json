@@ -32,43 +32,67 @@
     "views": {
       "modiqo-explorer": [
         {
+          "id": "modiqo-setup",
+          "name": "Setup",
+          "type": "tree"
+        },
+        {
           "id": "modiqo-info",
           "name": "Info",
-          "type": "tree"
+          "type": "tree",
+          "when": "modiqo.dexReady"
         },
         {
           "id": "modiqo-adapters",
           "name": "Adapters",
-          "type": "tree"
+          "type": "tree",
+          "when": "modiqo.dexReady"
         },
         {
           "id": "modiqo-flows",
           "name": "Flows",
-          "type": "tree"
+          "type": "tree",
+          "when": "modiqo.dexReady"
         },
         {
           "id": "modiqo-workspaces",
           "name": "Workspaces",
-          "type": "tree"
+          "type": "tree",
+          "when": "modiqo.dexReady"
         },
         {
           "id": "modiqo-registry",
           "name": "Registry",
-          "type": "tree"
+          "type": "tree",
+          "when": "modiqo.dexReady"
         },
         {
           "id": "modiqo-vault",
           "name": "Vault",
-          "type": "tree"
+          "type": "tree",
+          "when": "modiqo.dexReady"
         },
         {
           "id": "modiqo-explore",
           "name": "Explore",
-          "type": "tree"
+          "type": "tree",
+          "when": "modiqo.dexReady"
         }
       ]
     },
     "commands": [
+      {
+        "command": "modiqo.openSetupWizard",
+        "title": "Open Setup Wizard",
+        "category": "modiqo",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "modiqo.installDex",
+        "title": "Install dex",
+        "category": "modiqo",
+        "icon": "$(cloud-download)"
+      },
       {
         "command": "modiqo.showReference",
         "title": "Show Reference",

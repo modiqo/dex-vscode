@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { execFile, spawn, ChildProcess } from "child_process";
 import { promisify } from "util";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
 const execFileAsync = promisify(execFile);
 
@@ -175,6 +178,36 @@ export interface DryRunResult {
   };
 }
 
+export interface SetupAdapterInfo {
+  id: string;
+  name: string;
+  description: string;
+  tools: number;
+  installed: boolean;
+}
+
+export interface SetupTokenRequirement {
+  env_var: string;
+  adapters: string[];
+  configured: boolean;
+  is_oauth: boolean;
+  url?: string;
+}
+
+export interface WireClient {
+  id: string;
+  name: string;
+  description: string;
+  installed: boolean;
+}
+
+export interface ProofResult {
+  adapter: string;
+  success: boolean;
+  output?: string;
+  error?: string;
+}
+
 export class DexClient {
   private dexPath: string;
 
@@ -291,8 +324,17 @@ export class DexClient {
     }
   }
 
-  /** Check if dex binary is available */
+  /** Check if dex is properly installed (binary + deno runtime at ~/.dex/bin/deno) */
   async isAvailable(): Promise<boolean> {
+    const homeDir = os.homedir();
+    const denoPath = path.join(homeDir, ".dex", "bin", "deno");
+
+    // The deno runtime is the key indicator of a proper dex install
+    if (!fs.existsSync(denoPath)) {
+      return false;
+    }
+
+    // Also verify the binary works
     return this.execSilent(["--version"]);
   }
 
@@ -628,6 +670,320 @@ export class DexClient {
     }
 
     return flows;
+  }
+
+  // ── Setup wizard methods ────────────────────────────────────────
+
+  /** Install an adapter from registry (streaming output).
+   *  Uses `dex registry adapter pull bootstrap/<id>` and auto-confirms. */
+  installAdapterStream(adapterId: string): ChildProcess {
+    const child = spawn(this.dexPath, ["registry", "adapter", "pull", `bootstrap/${adapterId}`], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env },
+    });
+    // Auto-confirm the [Y/n] prompt
+    child.stdin?.write("y\n");
+    child.stdin?.end();
+    return child;
+  }
+
+  /** Pull associated skills/flows for an installed adapter.
+   *  Uses `dex registry skill search <adapterId>` to get full (non-truncated) names,
+   *  then pulls each matching skill. */
+  async pullAssociatedSkills(adapterId: string): Promise<number> {
+    // Search for skills associated with this adapter
+    let searchOutput: string;
+    try {
+      searchOutput = await this.execText(["registry", "skill", "search", adapterId]);
+    } catch {
+      return 0;
+    }
+
+    // Parse full skill names from the search results table
+    const skillNames: string[] = [];
+    for (const line of searchOutput.split("\n")) {
+      if (!line.includes("\u2502")) { continue; }
+      const cells = line.split("\u2502").map((c) => c.trim());
+      const filtered = cells.filter((_, i) => i > 0 && i < cells.length - 1);
+      if (filtered.length < 2) { continue; }
+      const name = filtered[0];
+      if (name && name !== "Name" && !name.includes("─")) {
+        // Deduplicate
+        if (!skillNames.includes(name)) {
+          skillNames.push(name);
+        }
+      }
+    }
+
+    let count = 0;
+    for (const name of skillNames) {
+      try {
+        const child = spawn(this.dexPath, ["registry", "skill", "pull", `bootstrap/${name}`], {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: { ...process.env },
+        });
+        child.stdin?.write("y\n");
+        child.stdin?.end();
+        const code = await new Promise<number | null>((resolve) => {
+          child.on("close", resolve);
+          child.on("error", () => resolve(1));
+        });
+        if (code === 0) { count++; }
+      } catch {
+        // Skip failures silently
+      }
+    }
+    return count;
+  }
+
+  /** Run OAuth setup for Google (opens browser for consent) */
+  oauthSetupGoogle(scopes: string[]): ChildProcess {
+    const args = ["oauth", "setup", "google", "--scopes", scopes.join(",")];
+    return spawn(this.dexPath, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env },
+    });
+  }
+
+  /** Wire a skill to an AI client via `dex install skill --provider <name> --agents` */
+  async wireClient(clientName: string): Promise<boolean> {
+    // Map extension wire IDs to dex provider names
+    const providerMap: Record<string, string> = {
+      "dex-skill-claude-code": "claude",
+      "dex-skill-cursor": "cursor",
+      "dex-skill-codex": "codex",
+      "dex-agents-md": "agents-md",
+    };
+    const provider = providerMap[clientName] || clientName;
+    return this.execSilent(["install", "skill", "--provider", provider, "--agents"]);
+  }
+
+  /** Get list of available skills for wiring */
+  async availableSkills(): Promise<RegistrySkill[]> {
+    return this.registrySkillList("bootstrap");
+  }
+
+  /** Get proof-of-life flow details for an adapter (mirrors Rust proof_flow_for) */
+  private proofFlowFor(adapterId: string): { flowName: string; args: string[] } | null {
+    const summary = "--output=summary";
+    const now = new Date();
+    switch (adapterId) {
+      case "github":
+        return { flowName: "search-github-repositories", args: ["trending", "any", "5", "stars", summary] };
+      case "gmail":
+        return { flowName: "retrieve-recent-emails", args: ["5", summary] };
+      case "calendar": {
+        const today = now.toISOString().replace(/T.*/, "T00:00:00Z");
+        const dayAfterTomorrow = new Date(now.getTime() + 2 * 86400000).toISOString().replace(/T.*/, "T00:00:00Z");
+        return { flowName: "check-calendar-meetings", args: [today, dayAfterTomorrow, summary] };
+      }
+      case "stripe": {
+        const todayStr = now.toISOString().slice(0, 10);
+        const monthStart = todayStr.slice(0, 8) + "01";
+        return { flowName: "fetch-stripe-payables-receivables", args: [monthStart, todayStr, "receivables", summary] };
+      }
+      case "linear":
+        return { flowName: "list-linear-issues", args: ["5", summary] };
+      default:
+        return null;
+    }
+  }
+
+  /** Run proof-of-life flow for an adapter using deno directly */
+  async runProofOfLife(adapterId: string): Promise<ProofResult> {
+    const proof = this.proofFlowFor(adapterId);
+    if (!proof) {
+      return { adapter: adapterId, success: false, error: "No proof flow for this adapter" };
+    }
+
+    const homeDir = os.homedir();
+    const flowPath = path.join(homeDir, ".dex", "flows", "bootstrap", proof.flowName, "main.ts");
+    const denoPath = path.join(homeDir, ".dex", "bin", "deno");
+    const cacheDir = path.join(homeDir, ".dex", "deno_cache");
+
+    if (!fs.existsSync(flowPath)) {
+      return { adapter: adapterId, success: false, error: `Flow not found: ${proof.flowName}` };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync(denoPath, ["run", "--allow-all", flowPath, ...proof.args], {
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, DENO_DIR: cacheDir },
+      });
+      // Strip ANSI escape codes from output
+      // eslint-disable-next-line no-control-regex
+      const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\[\?[0-9;]*[a-zA-Z]/g, "");
+      const raw = stdout.trim() || stderr.trim();
+      const output = stripAnsi(raw);
+      return { adapter: adapterId, success: true, output };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { adapter: adapterId, success: false, error: msg };
+    }
+  }
+
+  /** Detect which tokens are needed by reading each adapter's manifest.json.
+   *  Mirrors the Rust `probe_adapter_tokens` logic from setup/state.rs. */
+  async detectTokenRequirements(): Promise<SetupTokenRequirement[]> {
+    const adaptersDir = path.join(os.homedir(), ".dex", "adapters");
+    const vaultTokens = await this.vaultTokenList();
+    const configuredNames = new Set(vaultTokens.map((t) => t.name));
+
+    // Also check via `dex token list` for configured tokens
+    const tokenList = await this.tokenList();
+    for (const t of tokenList) {
+      if (t.configured) { configuredNames.add(t.env_var); }
+    }
+
+    // Read installed adapter dirs
+    let adapterDirs: string[] = [];
+    try {
+      adapterDirs = fs.readdirSync(adaptersDir).filter((d) => {
+        const stat = fs.statSync(path.join(adaptersDir, d));
+        return stat.isDirectory();
+      });
+    } catch {
+      return [];
+    }
+
+    // Read manifest.json from each adapter to get token_env
+    const byEnv = new Map<string, string[]>();
+    for (const adapterId of adapterDirs) {
+      const manifestPath = path.join(adaptersDir, adapterId, "manifest.json");
+      const envVar = this.readTokenEnvFromManifest(manifestPath);
+      if (envVar) {
+        const list = byEnv.get(envVar) || [];
+        list.push(adapterId);
+        byEnv.set(envVar, list);
+      }
+    }
+
+    const reqs: SetupTokenRequirement[] = [];
+    for (const [envVar, adapterIds] of byEnv) {
+      reqs.push({
+        env_var: envVar,
+        adapters: adapterIds,
+        configured: configuredNames.has(envVar),
+        is_oauth: envVar === "GSUITE_TOKEN",
+        url: DexClient.tokenUrlFor(envVar),
+      });
+    }
+    return reqs;
+  }
+
+  /** Extract token env var from adapter manifest.json auth section.
+   *  Supports simple auth (token_env/key_env) and per-operation auth (schemes). */
+  private readTokenEnvFromManifest(manifestPath: string): string | undefined {
+    try {
+      const content = fs.readFileSync(manifestPath, "utf-8");
+      const manifest = JSON.parse(content);
+      const auth = manifest?.auth;
+      if (!auth) { return undefined; }
+
+      // Simple auth: top-level token_env or key_env
+      if (auth.token_env) { return auth.token_env; }
+      if (auth.key_env) { return auth.key_env; }
+
+      // Per-operation auth: schemes[default_scheme].token_env or .key_env
+      const defaultScheme = auth.default_scheme;
+      if (defaultScheme && auth.schemes?.[defaultScheme]) {
+        const scheme = auth.schemes[defaultScheme];
+        if (scheme.token_env) { return scheme.token_env; }
+        if (scheme.key_env) { return scheme.key_env; }
+      }
+    } catch {
+      // Manifest unreadable
+    }
+    return undefined;
+  }
+
+  /** Get URL where user can create/find their token. Mirrors Rust token_url_for(). */
+  private static tokenUrlFor(envVar: string): string | undefined {
+    const urls: Record<string, string> = {
+      GITHUB_TOKEN: "https://github.com/settings/tokens/new",
+      GEMINI_API_KEY: "https://aistudio.google.com/app/apikey",
+      LINEAR_API: "https://linear.app/settings/api",
+      ADAPTER_NOTION_TOKEN: "https://www.notion.so/my-integrations",
+      CLOUDFLARE_API: "https://dash.cloudflare.com/profile/api-tokens",
+      ELEVEN_LABS_API: "https://elevenlabs.io/app/settings/api-keys",
+      MANUS_API: "https://app.manus.ai/settings/api",
+      STRIPE_API: "https://dashboard.stripe.com/apikeys",
+    };
+    return urls[envVar];
+  }
+
+  /** Ensure baseline stdio MCP servers are configured in ~/.dex/config/mcp.json */
+  async ensureStdioBaseline(): Promise<void> {
+    const homeDir = os.homedir();
+    const configDir = path.join(homeDir, ".dex", "config");
+    const mcpPath = path.join(configDir, "mcp.json");
+
+    // Only write if mcp.json doesn't exist or has no servers
+    let needsWrite = true;
+    try {
+      const existing = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+      const servers = existing?.mcpServers;
+      if (servers && Object.keys(servers).length > 0) {
+        needsWrite = false;
+      }
+    } catch {
+      // File doesn't exist or invalid JSON
+    }
+
+    if (needsWrite) {
+      const mcpConfig = {
+        mcpServers: {
+          "playwright-headed": {
+            command: "npx",
+            args: ["-y", "@playwright/mcp@latest", "--browser", "chrome", "--no-sandbox"],
+          },
+          "playwright-nosandbox": {
+            command: "npx",
+            args: ["-y", "@playwright/mcp@latest", "--browser", "chrome", "--no-sandbox", "--headless"],
+          },
+          "chrome-devtools-headed": {
+            command: "npx",
+            args: ["chrome-devtools-mcp@latest", "--chromeArg=--no-sandbox", "--chromeArg=--disable-setuid-sandbox"],
+          },
+          "chrome-devtools-nosandbox": {
+            command: "npx",
+            args: ["chrome-devtools-mcp@latest", "--headless", "--chromeArg=--no-sandbox", "--chromeArg=--disable-setuid-sandbox"],
+          },
+          filesystem: {
+            command: "npx",
+            args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+          },
+        },
+      };
+
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+      }
+      fs.writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2) + "\n");
+    }
+  }
+
+  /** Start the stdio daemon (idempotent) */
+  async startDaemon(): Promise<void> {
+    try {
+      await this.execSilent(["daemon", "start"]);
+    } catch {
+      // Daemon may already be running — that's fine
+    }
+  }
+
+  /** Check if setup is complete (has adapters, tokens, and skills) */
+  async isSetupComplete(): Promise<boolean> {
+    try {
+      const [adapters, tokens] = await Promise.all([
+        this.adapterList(),
+        this.tokenList(),
+      ]);
+      return adapters.length > 0 && tokens.some((t) => t.configured);
+    } catch {
+      return false;
+    }
   }
 
   /** Parse @@section-based whoami output */
