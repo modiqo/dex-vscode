@@ -2034,7 +2034,7 @@ const vscode = acquireVsCodeApi();
 // ── State ──────────────────────────────────
 
 let currentStep = 0;
-const STEPS = ['Welcome', 'Sign In', 'APIs', 'Credentials', 'Wire', 'Verify', 'Done'];
+const STEPS = ['Welcome', 'Sign In', 'APIs', 'Credentials', 'Wire', 'Live Proof', 'Done'];
 
 let loginEmail = '';
 let registryAdapters = [];
@@ -2978,7 +2978,7 @@ function handleWireProgress(msg) {
 function renderProof(el) {
   const adapters = installedAdapters.length > 0 ? installedAdapters : [];
   if (adapters.length === 0) {
-    el.innerHTML = '<h2>Verification</h2><div class="subtitle">No adapters to verify.</div><div class="btn-row-right"><button class="btn btn-primary" onclick="next()">Finish Setup \\u2192</button></div>';
+    el.innerHTML = '<h2 style="font-weight:300;font-size:1.6em;letter-spacing:-0.02em;">Live proof</h2><div class="subtitle" style="color:var(--orange);font-weight:500;opacity:0.9;">No adapters to verify.</div><div class="btn-row-right"><button class="btn btn-primary" onclick="next()">Finish Setup \\u2192</button></div>';
     return;
   }
 
@@ -2992,15 +2992,15 @@ function renderProof(el) {
           <div class="verify-badge" id="badge-\${a}">Running</div>
         </div>
         <div class="verify-body" id="body-\${a}">
-          <div class="verify-running muted">Executing proof-of-life check...</div>
+          <div class="verify-running muted">Calling live API...</div>
         </div>
       </div>
     \`;
   }
 
   el.innerHTML = \`
-    <h2>Verification</h2>
-    <div class="subtitle">Running proof-of-life checks on your configured adapters.</div>
+    <h2 style="font-weight:300;font-size:1.6em;letter-spacing:-0.02em;">Live proof</h2>
+    <div class="subtitle" style="color:var(--orange);font-weight:500;opacity:0.9;">Real API calls on your data. No model. No tokens. No waiting.</div>
     <div class="verify-counter" id="verifyCounter">0 / \${adapters.length} verified</div>
     <div class="verify-list">\${cards}</div>
     <div id="proofActions"></div>
