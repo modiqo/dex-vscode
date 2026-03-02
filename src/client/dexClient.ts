@@ -916,6 +916,14 @@ export class DexClient {
       ELEVEN_LABS_API: "https://elevenlabs.io/app/settings/api-keys",
       MANUS_API: "https://app.manus.ai/settings/api",
       STRIPE_API: "https://dashboard.stripe.com/apikeys",
+      PARALLEL_WEB_TOKEN: "https://platform.parallel.ai/settings?tab=api-keys",
+      EXA_TOKEN: "https://dashboard.exa.ai/api-keys",
+      GMAIL_TOKEN: "https://console.cloud.google.com/apis/credentials",
+      GOOGLE_CALENDAR_TOKEN: "https://console.cloud.google.com/apis/credentials",
+      SLACK_TOKEN: "https://api.slack.com/apps",
+      DRIVE_API_TOKEN: "https://console.cloud.google.com/apis/credentials",
+      GOOGLE_DOCS_TOKEN: "https://console.cloud.google.com/apis/credentials",
+      ASTRONOMER_TOKEN: "https://cloud.astronomer.io/settings",
     };
     return urls[envVar];
   }
