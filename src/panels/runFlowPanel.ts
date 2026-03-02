@@ -242,13 +242,31 @@ function resolveDexPath(): string {
   return "dex";
 }
 
-/** Strip ANSI escape codes + carriage-return spinner overwrites */
+/** Strip ANSI escape codes and collapse carriage-return spinner overwrites.
+ *
+ * The dex task-queue spinner writes lines like:
+ *   \r  ⠋ fetch-details  0.1s  [running]
+ *   \r  ⠙ fetch-details  0.2s  [running]
+ *   \r  ✔ fetch-details  7.5s  completed
+ *
+ * Each \r moves to the start of the current line, overwriting it.
+ * We process these so only the final state of each line is kept.
+ */
 function stripAnsi(s: string): string {
-  // Remove ANSI escape sequences
+  // Remove ANSI escape sequences (SGR, cursor movement, erase-line etc.)
   // eslint-disable-next-line no-control-regex
-  let out = s.replace(/\x1B\[[0-9;]*[mGKHFJST]/g, "");
-  // Remove carriage returns (spinner line overwrites)
-  out = out.replace(/\r[^\n]/g, "");
+  let out = s.replace(/\x1B\[[0-9;?]*[A-Za-z]/g, "");
+
+  // Simulate carriage-return overwrite: split on \n, then within each
+  // "physical line" keep only the last \r-separated segment.
+  out = out
+    .split("\n")
+    .map((line) => {
+      const parts = line.split("\r");
+      return parts[parts.length - 1];
+    })
+    .join("\n");
+
   return out;
 }
 
@@ -569,15 +587,57 @@ function showView(name) {
   });
 }
 
+// Spinner chars used by the dex task queue
+const SPINNER_CHARS = new Set(['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']);
+// Map of task-name → index in logLines for in-place spinner updates
+const spinnerIdx = {};
+
+/** Extract task name from a spinner/completed line: "⠋ fetch-details  0.1s  [running]" */
+function spinnerTaskName(line) {
+  // Matches: <spinner-or-checkmark> <task-name>  <duration>  <status>
+  const m = line.match(/^[^\s]+\s+([^\s]+)\s+[\d.]+s/);
+  return m ? m[1] : null;
+}
+
+function isSpinnerLine(line) {
+  const first = [...line][0]; // first Unicode char
+  return SPINNER_CHARS.has(first);
+}
+
+function isCompletedLine(line) {
+  const first = [...line][0];
+  return first === '✔' || first === '✓' || first === '✗';
+}
+
 function appendLog(text, cls) {
   const box = document.getElementById('log-box');
-  const lines = text.split('\\n');
+  // Handle any stray \r left over (inter-chunk boundaries)
+  const segments = text.split('\\r');
+  const lines = segments[segments.length - 1].split('\\n');
+
   for (const line of lines) {
-    const trimmed = line.replace(/\\r/g, '').trim();
+    const trimmed = line.trim();
     if (!trimmed) continue;
-    if (logLines.length >= MAX_LOG_LINES) { logLines.shift(); }
-    logLines.push({ text: trimmed, cls: cls || classifyLine(trimmed) });
+
+    const lineCls = cls || classifyLine(trimmed);
+    const taskName = spinnerTaskName(trimmed);
+
+    if (taskName && (isSpinnerLine(trimmed) || isCompletedLine(trimmed))) {
+      if (spinnerIdx[taskName] !== undefined) {
+        // Update existing entry in-place
+        logLines[spinnerIdx[taskName]] = { text: trimmed, cls: lineCls };
+      } else {
+        // First time we see this task
+        if (logLines.length >= MAX_LOG_LINES) { logLines.shift(); }
+        spinnerIdx[taskName] = logLines.length;
+        logLines.push({ text: trimmed, cls: lineCls });
+      }
+    } else {
+      if (logLines.length >= MAX_LOG_LINES) { logLines.shift(); }
+      logLines.push({ text: trimmed, cls: lineCls });
+    }
   }
+
   box.innerHTML = logLines.map(l =>
     '<div class="log-line '+ l.cls +'">' + escHtml(l.text) + '</div>'
   ).join('');
@@ -585,9 +645,10 @@ function appendLog(text, cls) {
 }
 
 function classifyLine(line) {
-  if (line.startsWith('✓') || line.startsWith('✔')) return 'ok';
-  if (line.startsWith('✗') || line.startsWith('Error') || line.startsWith('error')) return 'err';
-  if (line.startsWith('⠋') || line.startsWith('⠙') || line.startsWith('[')) return 'dim';
+  const first = [...line][0];
+  if (first === '✓' || first === '✔') return 'ok';
+  if (first === '✗' || line.startsWith('Error') || line.startsWith('error')) return 'err';
+  if (SPINNER_CHARS.has(first) || line.startsWith('[')) return 'dim';
   return '';
 }
 
@@ -742,6 +803,7 @@ window.addEventListener('message', e => {
   const msg = e.data;
   if (msg.type === 'start') {
     logLines = [];
+    Object.keys(spinnerIdx).forEach(k => delete spinnerIdx[k]);
     showView('running');
     document.getElementById('run-title').textContent = 'Running ' + escHtml(msg.flowName) + '…';
     document.getElementById('run-args').textContent =
