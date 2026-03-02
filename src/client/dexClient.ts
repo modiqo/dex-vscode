@@ -790,7 +790,7 @@ export class DexClient {
         return { flowName: "list-linear-issues", args: ["5", summary] };
       case "polymarket-data":
       case "polymarket-gamma":
-        return { flowName: "whale-flow-monitor", args: ["crypto", "3", "50000", summary] };
+        return { flowName: "whale-flow-monitor", args: ["politics", "15", "100000", summary] };
       default:
         return null;
     }

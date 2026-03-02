@@ -1378,6 +1378,36 @@ body.vscode-dark .mcp-bundle-header { background: rgba(255,255,255,0.02); }
   font-size: 10px;
 }
 
+/* ── Proof output modal ──────────────────── */
+.proof-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 999;
+  display: flex; align-items: center; justify-content: center;
+}
+.proof-modal {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  width: min(640px, 92vw); max-height: 75vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+}
+.proof-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
+}
+.proof-modal-title { font-weight: 600; font-size: 0.95em; }
+.proof-modal-close {
+  background: none; border: none; color: var(--fg-dim); cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.proof-modal-close:hover { color: var(--fg); background: var(--border); }
+.proof-modal-body {
+  overflow-y: auto; padding: 16px 20px; flex: 1;
+  font-family: var(--mono); font-size: 0.8em; line-height: 1.6; white-space: pre-wrap;
+  color: var(--fg);
+}
+.proof-modal-footer {
+  padding: 10px 20px; border-top: 1px solid var(--border);
+  font-size: 0.72em; color: var(--fg-dim);
+}
+
 /* ── Status indicators ───────────────────── */
 
 .status-badge {
@@ -3026,6 +3056,7 @@ function handleProofResult(msg) {
 
   if (msg.status === 'success') {
     card.classList.add('success');
+    card.dataset.output = msg.output || '';
 
     // Status dot → green check
     if (dot) dot.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="var(--success)" opacity="0.15"/><path d="M5.5 9.5l2 2 5-5" stroke="var(--success)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -3047,6 +3078,7 @@ function handleProofResult(msg) {
         }
         html += '</div>';
       }
+      html += '<button class="btn btn-ghost" style="margin-top:10px;font-size:0.78em;padding:4px 10px;" onclick="showProofOutput(' + "'" + msg.adapter + "'" + ', this)">View full output</button>';
       body.innerHTML = html;
     } else if (body) {
       body.innerHTML = '<div class="verify-result-header">Verified</div>';
@@ -3090,6 +3122,41 @@ function handleProofResult(msg) {
     }
     document.getElementById('proofActions').innerHTML = '<div class="btn-row-right" style="margin-top:24px;"><button class="btn btn-primary" onclick="next()">Complete Setup \\u2192</button></div>';
   }
+}
+
+function showProofOutput(adapter, btn) {
+  var existing = document.getElementById('proofModalOverlay');
+  if (existing) { existing.remove(); return; }
+  var card = btn.closest('.verify-card');
+  var output = card ? (card.dataset.output || '') : '';
+  var overlay = document.createElement('div');
+  overlay.className = 'proof-modal-overlay';
+  overlay.id = 'proofModalOverlay';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  var modal = document.createElement('div');
+  modal.className = 'proof-modal';
+  var header = document.createElement('div');
+  header.className = 'proof-modal-header';
+  var title = document.createElement('div');
+  title.className = 'proof-modal-title';
+  title.textContent = adapter + ' - live output';
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'proof-modal-close';
+  closeBtn.textContent = 'x';
+  closeBtn.onclick = function() { overlay.remove(); };
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+  var body = document.createElement('div');
+  body.className = 'proof-modal-body';
+  body.textContent = output;
+  var footer = document.createElement('div');
+  footer.className = 'proof-modal-footer';
+  footer.textContent = 'Deterministic, no model, no tokens.';
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 // ── Step 6: Complete ───────────────────────
