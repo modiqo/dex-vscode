@@ -201,6 +201,8 @@ async function handleInstallAdapters(
   adapterIds: string[],
 ): Promise<void> {
   const alreadyPulled = new Set<string>();
+
+  // Mark all as pending immediately
   for (const id of adapterIds) {
     panel.webview.postMessage({
       type: "install-progress",
@@ -209,18 +211,18 @@ async function handleInstallAdapters(
       message: "Connecting to registry...",
       logs: [],
     });
+  }
 
+  await Promise.all(adapterIds.map(async (id) => {
     const child = client.installAdapterStream(id);
     const logLines: string[] = [];
 
     const pushLog = (raw: string) => {
       const lines = raw.split("\n").map((l: string) => l.trim()).filter(Boolean);
       for (const line of lines) {
-        // Skip empty decorator lines
         if (/^[─┌┐└┘├┤┬┴┼│]+$/.test(line)) { continue; }
         logLines.push(line);
       }
-      // Keep last 3 lines
       const recent = logLines.slice(-3);
       panel.webview.postMessage({
         type: "install-progress",
@@ -231,12 +233,8 @@ async function handleInstallAdapters(
       });
     };
 
-    child.stdout?.on("data", (data: Buffer) => {
-      pushLog(data.toString());
-    });
-    child.stderr?.on("data", (data: Buffer) => {
-      pushLog(data.toString());
-    });
+    child.stdout?.on("data", (data: Buffer) => { pushLog(data.toString()); });
+    child.stderr?.on("data", (data: Buffer) => { pushLog(data.toString()); });
 
     const exitCode = await new Promise<number | null>((resolve) => {
       child.on("close", resolve);
@@ -244,7 +242,6 @@ async function handleInstallAdapters(
     });
 
     if (exitCode === 0) {
-      // Pull associated flows/skills for this adapter
       const recent = logLines.slice(-3);
       panel.webview.postMessage({
         type: "install-progress",
@@ -276,7 +273,7 @@ async function handleInstallAdapters(
         logs: recent,
       });
     }
-  }
+  }));
 }
 
 function handleOAuthGoogle(
@@ -2084,6 +2081,7 @@ let selectedWireClients = new Set();
 let proofResults = {};
 
 const POPULAR = ['github', 'gmail', 'calendar', 'stripe'];
+const MAX_ADAPTERS = 8;
 
 const WIRE_CLIENTS = [
   { id: 'dex-skill-claude-code', name: 'Claude Code', desc: 'Wire dex MCP tools into Anthropic Claude Code',
@@ -2443,7 +2441,7 @@ function renderAdapters(el) {
 
   el.innerHTML = \`
     <h2 style="font-weight:300; letter-spacing:-0.5px;">API Catalog</h2>
-    <div class="subtitle" style="margin-bottom:16px;">We recommend starting with the defaults below. You can always add more later.</div>
+    <div class="subtitle" id="adapterSubtitle" style="margin-bottom:16px;">Pick up to 8 to start. You can always add more later.</div>
     <div class="selection-strip" id="selectionStrip">\${strip}</div>
     \${sections}
     \${selectedAdapters.size > 0 ? \`
@@ -2456,11 +2454,40 @@ function renderAdapters(el) {
       </div>
     \` : ''}
   \`;
+
+  // Update subtitle and lock cards based on limit — no nested template literals
+  var subtitle = el.querySelector('#adapterSubtitle');
+  if (subtitle) {
+    var remaining = MAX_ADAPTERS - selectedAdapters.size;
+    if (remaining === 0) {
+      subtitle.textContent = 'You have reached the limit. Experience dex and add more as you grow.';
+    } else if (remaining === 1) {
+      subtitle.textContent = 'One more slot left.';
+    } else if (remaining <= 3) {
+      subtitle.textContent = remaining + ' slots left — start lean, compound fast.';
+    } else {
+      subtitle.textContent = 'Pick up to 8 to start. You can always add more later.';
+    }
+  }
+  // Grey out unselected cards when at limit
+  var allCards = el.querySelectorAll('.catalog-card');
+  allCards.forEach(function(card) {
+    if (selectedAdapters.size >= MAX_ADAPTERS && !card.classList.contains('selected')) {
+      card.style.opacity = '0.35';
+      card.style.pointerEvents = 'none';
+    } else {
+      card.style.opacity = '';
+      card.style.pointerEvents = '';
+    }
+  });
 }
 
 function toggleAdapter(name) {
-  if (selectedAdapters.has(name)) selectedAdapters.delete(name);
-  else selectedAdapters.add(name);
+  if (selectedAdapters.has(name)) {
+    selectedAdapters.delete(name);
+  } else if (selectedAdapters.size < MAX_ADAPTERS) {
+    selectedAdapters.add(name);
+  }
   renderStep();
 }
 
