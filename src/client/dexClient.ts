@@ -1287,16 +1287,21 @@ export class DexClient {
     const home = os.homedir();
     const access = (p: string) => fs.promises.access(p).then(() => true).catch(() => false);
 
-    const [dexBin, denoBin, whoami, adapters, tokens] = await Promise.all([
+    // Check sign-in via local registry config (avoids network call + token expiry issues)
+    const registrySignedIn = await fs.promises
+      .readFile(path.join(home, ".dex", "registry", "config.json"), "utf8")
+      .then(txt => { const d = JSON.parse(txt); return !!(d.user_id && d.email); })
+      .catch(() => false);
+
+    const [dexBin, denoBin, adapters, tokens] = await Promise.all([
       access(path.join(home, ".local", "bin", "dex")),
       access(path.join(home, ".dex", "bin", "deno")),
-      this.registryWhoami().catch(() => null),
       this.adapterList().catch(() => [] as Adapter[]),
       this.tokenList().catch(() => [] as TokenInfo[]),
     ]);
 
     if (!dexBin || !denoBin) return 0;
-    if (!whoami?.email) return 1;
+    if (!registrySignedIn) return 1;
     if (adapters.length === 0) return 2;
     if (tokens.filter((t: TokenInfo) => t.configured).length === 0) return 3;
 
