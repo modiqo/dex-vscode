@@ -242,31 +242,13 @@ function resolveDexPath(): string {
   return "dex";
 }
 
-/** Strip ANSI escape codes and collapse carriage-return spinner overwrites.
- *
- * The dex task-queue spinner writes lines like:
- *   \r  ⠋ fetch-details  0.1s  [running]
- *   \r  ⠙ fetch-details  0.2s  [running]
- *   \r  ✔ fetch-details  7.5s  completed
- *
- * Each \r moves to the start of the current line, overwriting it.
- * We process these so only the final state of each line is kept.
- */
+/** Strip ANSI escape codes + carriage-return spinner overwrites */
 function stripAnsi(s: string): string {
-  // Remove ANSI escape sequences (SGR, cursor movement, erase-line etc.)
+  // Remove ANSI escape sequences
   // eslint-disable-next-line no-control-regex
-  let out = s.replace(/\x1B\[[0-9;?]*[A-Za-z]/g, "");
-
-  // Simulate carriage-return overwrite: split on \n, then within each
-  // "physical line" keep only the last \r-separated segment.
-  out = out
-    .split("\n")
-    .map((line) => {
-      const parts = line.split("\r");
-      return parts[parts.length - 1];
-    })
-    .join("\n");
-
+  let out = s.replace(/\x1B\[[0-9;]*[mGKHFJST]/g, "");
+  // Remove carriage returns (spinner line overwrites)
+  out = out.replace(/\r[^\n]/g, "");
   return out;
 }
 
@@ -484,8 +466,8 @@ function buildRunFlowHtml(flow: FlowInfo): string {
   }
 
   <div class="actions">
-    <button class="btn-primary" id="btn-run">▶ Run Flow</button>
-    <button class="btn-ghost" id="btn-cancel">Cancel</button>
+    <button class="btn-primary" onclick="submitForm()">▶ Run Flow</button>
+    <button class="btn-ghost" onclick="cancel()">Cancel</button>
   </div>
 
   <div class="cmd-preview">
@@ -502,7 +484,7 @@ function buildRunFlowHtml(flow: FlowInfo): string {
       <div class="run-title" id="run-title">Running ${escHtml(flow.name)}…</div>
       <div class="run-subtitle" id="run-args"></div>
     </div>
-    <button class="btn-danger" style="margin-left:auto" id="btn-kill">Stop</button>
+    <button class="btn-danger" style="margin-left:auto" onclick="killFlow()">Stop</button>
   </div>
   <div class="log-box" id="log-box"></div>
 </div>
@@ -520,8 +502,8 @@ function buildRunFlowHtml(flow: FlowInfo): string {
   <div id="result-content"></div>
 
   <div class="result-actions">
-    <button class="btn-primary" id="btn-run-again">▶ Run Again</button>
-    <button class="btn-ghost" id="btn-terminal">Open in Terminal</button>
+    <button class="btn-primary" onclick="runAgain()">▶ Run Again</button>
+    <button class="btn-ghost" onclick="openInTerminal()">Open in Terminal</button>
   </div>
 </div>
 
@@ -532,9 +514,6 @@ const flowName = ${JSON.stringify(flow.name)};
 let lastArgs = [];
 let logLines = [];
 const MAX_LOG_LINES = 200;
-
-// Spinner chars used by the dex task queue — declared here so all functions can access them
-const SPINNER_CHARS = new Set(['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']);
 
 function getInputs() {
   return Array.from(document.querySelectorAll('#view-form input[data-name]'));
@@ -573,13 +552,12 @@ function submitForm() {
   vscode.postMessage({ type: 'run', args: lastArgs });
 }
 
-document.getElementById('btn-run').addEventListener('click', submitForm);
-document.getElementById('btn-cancel').addEventListener('click', () => vscode.postMessage({ type: 'cancel' }));
-document.getElementById('btn-kill').addEventListener('click', () => vscode.postMessage({ type: 'kill' }));
-document.getElementById('btn-run-again').addEventListener('click', () => showView('form'));
-document.getElementById('btn-terminal').addEventListener('click', () => {
+function cancel() { vscode.postMessage({ type: 'cancel' }); }
+function killFlow() { vscode.postMessage({ type: 'kill' }); }
+function runAgain() { showView('form'); }
+function openInTerminal() {
   vscode.postMessage({ type: 'open-terminal', args: lastArgs, flowPath });
-});
+}
 
 getInputs().forEach(inp => {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitForm(); });
@@ -591,42 +569,15 @@ function showView(name) {
   });
 }
 
-/** Extract task name from a spinner/task line: "⠋ fetch-details  0.1s  [running]" → "fetch-details" */
-function spinnerTaskName(line) {
-  const m = line.match(/^[^\s]+\s+([^\s]+)\s+[\d.]+s/);
-  return m ? m[1] : null;
-}
-
 function appendLog(text, cls) {
   const box = document.getElementById('log-box');
-  // Split on actual newlines; also handle \r-prefixed spinner chunks
-  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const lines = normalized.split('\n');
-
+  const lines = text.split('\\n');
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = line.replace(/\\r/g, '').trim();
     if (!trimmed) continue;
-
-    const lineCls = cls || classifyLine(trimmed);
-    const taskName = spinnerTaskName(trimmed);
-    const first = [...trimmed][0];
-    const isTaskLine = taskName && (SPINNER_CHARS.has(first) || first === '✔' || first === '✓' || first === '✗');
-
-    if (isTaskLine) {
-      // Find and update existing entry for this task, or add new
-      const existing = logLines.findLastIndex(l => spinnerTaskName(l.text) === taskName);
-      if (existing >= 0) {
-        logLines[existing] = { text: trimmed, cls: lineCls };
-      } else {
-        if (logLines.length >= MAX_LOG_LINES) { logLines.shift(); }
-        logLines.push({ text: trimmed, cls: lineCls });
-      }
-    } else {
-      if (logLines.length >= MAX_LOG_LINES) { logLines.shift(); }
-      logLines.push({ text: trimmed, cls: lineCls });
-    }
+    if (logLines.length >= MAX_LOG_LINES) { logLines.shift(); }
+    logLines.push({ text: trimmed, cls: cls || classifyLine(trimmed) });
   }
-
   box.innerHTML = logLines.map(l =>
     '<div class="log-line '+ l.cls +'">' + escHtml(l.text) + '</div>'
   ).join('');
@@ -634,10 +585,9 @@ function appendLog(text, cls) {
 }
 
 function classifyLine(line) {
-  const first = [...line][0];
-  if (first === '✓' || first === '✔') return 'ok';
-  if (first === '✗' || line.startsWith('Error') || line.startsWith('error')) return 'err';
-  if (SPINNER_CHARS.has(first) || line.startsWith('[')) return 'dim';
+  if (line.startsWith('✓') || line.startsWith('✔')) return 'ok';
+  if (line.startsWith('✗') || line.startsWith('Error') || line.startsWith('error')) return 'err';
+  if (line.startsWith('⠋') || line.startsWith('⠙') || line.startsWith('[')) return 'dim';
   return '';
 }
 

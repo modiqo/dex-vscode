@@ -28,6 +28,7 @@ import { showReferencePanel } from "./panels/referencePanel";
 import { showSetupWizardPanel, showInstallPanel, showRegistryLoginPanel } from "./panels/setupWizardPanel";
 import { showVaultPullPanel } from "./panels/vaultPullPanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
+import { WorkspaceTreeItem } from "./views/workspaceTree";
 
 export function activate(context: vscode.ExtensionContext): void {
   const client = new DexClient();
@@ -191,17 +192,17 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("modiqo.refreshWorkspaces", () => {
       workspaceTree.refresh();
     }),
-    vscode.commands.registerCommand("modiqo.showTrace", (ws) => {
-      showTracePanel(context.extensionUri, ws);
+    vscode.commands.registerCommand("modiqo.showTrace", (arg) => {
+      showTracePanel(context.extensionUri, arg instanceof WorkspaceTreeItem ? arg.ws : arg);
     }),
-    vscode.commands.registerCommand("modiqo.showCommands", (ws) => {
-      showCommandsPanel(context.extensionUri, ws);
+    vscode.commands.registerCommand("modiqo.showCommands", (arg) => {
+      showCommandsPanel(context.extensionUri, arg instanceof WorkspaceTreeItem ? arg.ws : arg);
     }),
-    vscode.commands.registerCommand("modiqo.showStats", (ws) => {
-      showStatsPanel(context.extensionUri, ws);
+    vscode.commands.registerCommand("modiqo.showStats", (arg) => {
+      showStatsPanel(context.extensionUri, arg instanceof WorkspaceTreeItem ? arg.ws : arg);
     }),
-    vscode.commands.registerCommand("modiqo.showPlan", (ws) => {
-      showPlanPanel(context.extensionUri, ws);
+    vscode.commands.registerCommand("modiqo.showPlan", (arg) => {
+      showPlanPanel(context.extensionUri, arg instanceof WorkspaceTreeItem ? arg.ws : arg);
     }),
     vscode.commands.registerCommand("modiqo.refreshRegistry", () => {
       registryTree.refresh();
