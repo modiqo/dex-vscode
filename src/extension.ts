@@ -26,6 +26,7 @@ import { SetupTreeProvider } from "./views/setupTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
 import { showReferencePanel } from "./panels/referencePanel";
 import { showSetupWizardPanel, showInstallPanel } from "./panels/setupWizardPanel";
+import { showVaultPullPanel } from "./panels/vaultPullPanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -318,28 +319,9 @@ export function activate(context: vscode.ExtensionContext): void {
       vaultTree.refresh();
     }),
     vscode.commands.registerCommand("modiqo.vaultPull", async () => {
-      const passphrase = await vscode.window.showInputBox({
-        prompt: "Enter vault passphrase",
-        placeHolder: "Passphrase for encrypted vault",
-        password: true,
-      });
-      if (!passphrase) { return; }
-
-      const success = await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Pulling vault...",
-          cancellable: false,
-        },
-        () => client.vaultPull(passphrase),
-      );
-
-      if (success) {
+      showVaultPullPanel(client, () => {
         vaultTree.refresh();
-        vscode.window.showInformationMessage("Vault pulled successfully.");
-      } else {
-        vscode.window.showErrorMessage("Vault pull failed. Check passphrase and try again.");
-      }
+      });
     }),
     vscode.commands.registerCommand("modiqo.refreshExplore", () => {
       exploreTree.refresh();

@@ -687,57 +687,36 @@ export class DexClient {
     return child;
   }
 
-  /** Map adapter IDs to search terms for skill discovery.
-   *  Some adapters (e.g. polymarket-data, polymarket-gamma) share skills
-   *  that are indexed under a different search term. */
-  private skillSearchTerm(adapterId: string): string {
-    switch (adapterId) {
-      case "polymarket-data":
-      case "polymarket-gamma":
-        return "polymarket";
-      default:
-        return adapterId;
-    }
-  }
-
   /** Pull associated skills/flows for an installed adapter.
-   *  Uses `dex registry skill search <adapterId>` to get full (non-truncated) names,
-   *  then pulls each matching skill. */
+   *  Uses `dex registry skill find-by-adapter <adapterId>` to discover skills
+   *  via fingerprint-based dependency lookup (same as CLI setup does). */
   async pullAssociatedSkills(adapterId: string, alreadyPulled?: Set<string>): Promise<number> {
-    const searchTerm = this.skillSearchTerm(adapterId);
+    // Skip if already pulled for this adapter
+    if (alreadyPulled?.has(adapterId)) { return 0; }
+    alreadyPulled?.add(adapterId);
 
-    // Skip if another adapter already searched with the same term (dedup for shared skills)
-    if (alreadyPulled?.has(searchTerm)) { return 0; }
-    alreadyPulled?.add(searchTerm);
-
-    // Search for skills associated with this adapter
-    let searchOutput: string;
+    // Find skills associated with this adapter via fingerprint lookup
+    let findOutput: string;
     try {
-      searchOutput = await this.execText(["registry", "skill", "search", searchTerm]);
+      findOutput = await this.execText(["registry", "skill", "find-by-adapter", adapterId]);
     } catch {
       return 0;
     }
 
-    // Parse full skill names from the search results table
-    const skillNames: string[] = [];
-    for (const line of searchOutput.split("\n")) {
-      if (!line.includes("\u2502")) { continue; }
-      const cells = line.split("\u2502").map((c) => c.trim());
-      const filtered = cells.filter((_, i) => i > 0 && i < cells.length - 1);
-      if (filtered.length < 2) { continue; }
-      const name = filtered[0];
-      if (name && name !== "Name" && !name.includes("─")) {
-        // Deduplicate
-        if (!skillNames.includes(name)) {
-          skillNames.push(name);
-        }
-      }
-    }
+    // Each line is "org/name" (e.g. "bootstrap/retrieve-rideshare-receipts")
+    const skillRefs = findOutput
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && l.includes("/"));
 
     let count = 0;
-    for (const name of skillNames) {
+    for (const skillRef of skillRefs) {
+      // Dedup across adapters (multiple adapters may share the same skill)
+      if (alreadyPulled?.has(skillRef)) { continue; }
+      alreadyPulled?.add(skillRef);
+
       try {
-        const child = spawn(this.dexPath, ["registry", "skill", "pull", `bootstrap/${name}`], {
+        const child = spawn(this.dexPath, ["registry", "skill", "pull", skillRef], {
           stdio: ["pipe", "pipe", "pipe"],
           env: { ...process.env },
         });
