@@ -386,6 +386,7 @@ ${CSS}
   <div class="wizard">
     <div class="progress-bar" id="progressBar"></div>
     <div class="step-container" id="stepContainer"></div>
+    <div id="ttaTimer" style="position:fixed; top:12px; right:20px; font-size:0.92em; font-weight:700; color:var(--fg); font-variant-numeric:tabular-nums; letter-spacing:0.01em;"></div>
   </div>
   <script>
 ${JS}
@@ -2082,6 +2083,7 @@ let proofResults = {};
 
 const POPULAR = ['github', 'gmail', 'calendar', 'stripe'];
 const MAX_ADAPTERS = 8;
+var wizardStartTime = Date.now();
 
 const WIRE_CLIENTS = [
   { id: 'dex-skill-claude-code', name: 'Claude Code', desc: 'Wire dex MCP tools into Anthropic Claude Code',
@@ -3132,20 +3134,29 @@ function handleProofResult(msg) {
     if (dot) dot.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="var(--error)" opacity="0.15"/><path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="var(--error)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>';
 
     // Badge
-    if (badge) { badge.className = 'verify-badge error'; badge.textContent = 'Failed'; }
+    var noProofFlow = (msg.error || '').indexOf('No proof flow') !== -1;
+    if (badge) {
+      badge.className = 'verify-badge error';
+      badge.textContent = noProofFlow ? 'Create one' : 'Failed';
+    }
 
     // Error display
     if (body) {
-      const errText = escapeHtml(msg.error || 'Check failed');
-      body.innerHTML = \`
-        <div class="verify-error-msg">\${errText}</div>
-        <div class="verify-error-hint">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;opacity:0.5;">
-            <path d="M6 1v4M6 7v4M1 6h4M7 6h4" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
-          </svg>
-          <span>Run <code>dex powerpack credentials</code> to fix</span>
-        </div>
-      \`;
+      if (noProofFlow) {
+        body.innerHTML = '<div class="verify-error-msg">No proof flow yet for this adapter.</div>'
+          + '<div class="verify-error-hint"><span>Run <code>dex flow template create</code> to build one</span></div>';
+      } else {
+        const errText = escapeHtml(msg.error || 'Check failed');
+        body.innerHTML = \`
+          <div class="verify-error-msg">\${errText}</div>
+          <div class="verify-error-hint">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;opacity:0.5;">
+              <path d="M6 1v4M6 7v4M1 6h4M7 6h4" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+            </svg>
+            <span>Run <code>dex powerpack credentials</code> to fix</span>
+          </div>
+        \`;
+      }
     }
   }
 
@@ -3266,6 +3277,41 @@ function renderComplete(el) {
       <button class="btn btn-primary" onclick="finishSetup()">Start using dex \\u2192</button>
     </div>
   \`;
+
+  var elapsedSec = Math.round((Date.now() - wizardStartTime) / 1000);
+  var timeStr = elapsedSec < 60 ? (elapsedSec + 's') : (Math.floor(elapsedSec / 60) + 'm ' + (elapsedSec % 60) + 's');
+  var funMessages = [
+    'Faster than your last standup.',
+    'Shorter than a coffee break.',
+    'Your APIs were ready before you finished reading.',
+    'Less time than it takes to find the right Slack channel.',
+    'Configured before the meeting could have started.',
+    'Done before most people read the README.'
+  ];
+  var funMsg = funMessages[Math.floor(elapsedSec / 15) % funMessages.length] || funMessages[0];
+
+  var ttaCard = document.createElement('div');
+  ttaCard.style.cssText = 'margin: 28px auto 0; max-width: 340px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; text-align: center; position: relative; overflow: hidden;';
+  var ttaAccent = document.createElement('div');
+  ttaAccent.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); border-radius: 10px 10px 0 0;';
+  var ttaLabel = document.createElement('div');
+  ttaLabel.style.cssText = 'font-size: 0.68em; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-dim); margin-bottom: 8px;';
+  ttaLabel.textContent = 'Time to Agent';
+  var ttaTm = document.createElement('sup');
+  ttaTm.style.cssText = 'font-size: 0.6em; vertical-align: super;';
+  ttaTm.textContent = 'TM';
+  ttaLabel.appendChild(ttaTm);
+  var ttaTime = document.createElement('div');
+  ttaTime.style.cssText = 'font-size: 2.8em; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fg); line-height: 1.1;';
+  ttaTime.textContent = timeStr;
+  var ttaMsg = document.createElement('div');
+  ttaMsg.style.cssText = 'font-size: 0.8em; color: var(--fg-dim); margin-top: 8px; font-style: italic;';
+  ttaMsg.textContent = funMsg;
+  ttaCard.appendChild(ttaAccent);
+  ttaCard.appendChild(ttaLabel);
+  ttaCard.appendChild(ttaTime);
+  ttaCard.appendChild(ttaMsg);
+  el.appendChild(ttaCard);
 }
 
 function finishSetup() {
@@ -3275,6 +3321,19 @@ function finishSetup() {
 // ── Init ───────────────────────────────────
 
 renderStep();
+
+(function() {
+  var timerEl = document.getElementById('ttaTimer');
+  function updateTimer() {
+    var sec = Math.floor((Date.now() - wizardStartTime) / 1000);
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    var timeStr = (m > 0 ? m + 'm ' : '') + s + 's';
+    timerEl.innerHTML = 'Time to Agent<sup style="font-size:0.6em;vertical-align:super;">\u2122</sup>  ' + timeStr;
+  }
+  updateTimer();
+  setInterval(updateTimer, 1000);
+})();
 `;
 
 // ── Install Panel (standalone dex binary install) ──────────

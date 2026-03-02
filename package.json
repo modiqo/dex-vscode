@@ -330,7 +330,7 @@
     "watch": "node esbuild.mjs --watch",
     "lint": "eslint src/",
     "test": "node ./dist/test/runTests.js",
-    "vscode:prepublish": "node esbuild.mjs --production",
+    "vscode:prepublish": "node --no-deprecation esbuild.mjs --production",
     "package": "vsce package"
   },
   "devDependencies": {
