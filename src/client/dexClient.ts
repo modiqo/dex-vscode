@@ -993,8 +993,8 @@ export class DexClient {
     try {
       const available = await this.isAvailable();
       if (!available) return false;
-      const adapters = await this.adapterList();
-      return adapters.length > 0;
+      const step = await this.wizardCheckpoint();
+      return step === 6;
     } catch {
       return false;
     }
