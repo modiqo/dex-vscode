@@ -1207,21 +1207,32 @@ export class DexClient {
     const tokens: TokenInfo[] = [];
     const lines = text.split("\n").filter((l) => l.trim().length > 0);
 
+    // New table format: │ NAME │ Type │ Expires In │ ...
+    if (text.includes("\u2502")) {
+      for (const line of lines) {
+        if (!line.includes("\u2502")) { continue; }
+        // Skip header and border lines
+        if (line.includes("Name") && line.includes("Type")) { continue; }
+        const cells = line.split("\u2502").map(c => c.trim()).filter(c => c.length > 0);
+        if (cells.length < 2) { continue; }
+        const name = cells[0];
+        if (!name || name.startsWith("\u2500") || name.startsWith("\u250c") || name.startsWith("\u2514") || name.startsWith("\u251c")) { continue; }
+        tokens.push({ env_var: name, adapter_id: "", configured: true });
+      }
+      return tokens;
+    }
+
+    // Legacy plain-text format: "GITHUB_TOKEN    github    ✓ configured"
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed.startsWith("-") || trimmed.startsWith("=")) {
-        continue;
-      }
-
-      // Best-effort parse: "GITHUB_TOKEN    github    ✓ configured"
+      if (trimmed.startsWith("-") || trimmed.startsWith("=")) { continue; }
       const match = trimmed.match(/^(\S+)\s+(\S+)\s+(.+)$/);
       if (match) {
         const [, envVar, adapterId, status] = match;
         tokens.push({
           env_var: envVar,
           adapter_id: adapterId,
-          configured:
-            status.includes("\u2713") || status.includes("configured"),
+          configured: status.includes("\u2713") || status.includes("configured"),
         });
       }
     }

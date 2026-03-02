@@ -40,43 +40,43 @@
           "id": "modiqo-info",
           "name": "Info",
           "type": "tree",
-          "when": "modiqo.dexReady"
+          "when": "modiqo.setupStep >= 2"
         },
         {
           "id": "modiqo-adapters",
           "name": "Adapters",
           "type": "tree",
-          "when": "modiqo.dexReady"
+          "when": "modiqo.setupStep >= 2"
         },
         {
           "id": "modiqo-flows",
           "name": "Flows",
           "type": "tree",
-          "when": "modiqo.dexReady"
+          "when": "modiqo.setupStep >= 3"
         },
         {
           "id": "modiqo-workspaces",
           "name": "Workspaces",
           "type": "tree",
-          "when": "modiqo.dexReady"
+          "when": "modiqo.setupStep >= 6"
         },
         {
           "id": "modiqo-registry",
           "name": "Registry",
           "type": "tree",
-          "when": "modiqo.dexReady"
+          "when": "modiqo.setupStep >= 2"
         },
         {
           "id": "modiqo-vault",
           "name": "Vault",
           "type": "tree",
-          "when": "modiqo.dexReady"
+          "when": "modiqo.setupStep >= 3"
         },
         {
           "id": "modiqo-explore",
           "name": "Explore",
           "type": "tree",
-          "when": "modiqo.dexReady"
+          "when": "modiqo.setupStep >= 2"
         }
       ]
     },

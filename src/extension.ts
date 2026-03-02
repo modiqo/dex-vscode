@@ -36,9 +36,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Helper to set dexReady context and reveal/hide views
   async function updateDexReadyContext(): Promise<void> {
-    const ready = await client.isSetupComplete();
+    const available = await client.isAvailable();
+    if (!available) {
+      await vscode.commands.executeCommand("setContext", "modiqo.dexReady", false);
+      await vscode.commands.executeCommand("setContext", "modiqo.setupStep", 0);
+      setupTree.setStatus("not-installed");
+      return;
+    }
+    const step = await client.wizardCheckpoint();
+    const ready = step === 6;
     await vscode.commands.executeCommand("setContext", "modiqo.dexReady", ready);
-    setupTree.setStatus(ready ? "complete" : (await client.isAvailable()) ? "needs-setup" : "not-installed");
+    await vscode.commands.executeCommand("setContext", "modiqo.setupStep", step);
+    setupTree.setStatus(ready ? "complete" : "needs-setup");
   }
 
   // Tree views
@@ -151,21 +160,19 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("modiqo.openSetupWizard", () => {
       showSetupWizardPanel(context.extensionUri, client, {
         onAdaptersInstalled: () => {
-          // Progressively reveal adapters, flows, and workspaces in sidebar
-          vscode.commands.executeCommand("setContext", "modiqo.dexReady", true);
+          updateDexReadyContext();
           adapterTree.refresh();
           flowTree.refresh();
           workspaceTree.refresh();
           statusBar.refresh();
         },
         onTokensConfigured: () => {
-          // Refresh vault and adapters when tokens change
+          updateDexReadyContext();
           vaultTree.refresh();
           adapterTree.refresh();
           statusBar.refresh();
         },
         onComplete: () => {
-          vscode.commands.executeCommand("setContext", "modiqo.dexReady", true);
           setupTree.setStatus("complete");
           adapterTree.refresh();
           flowTree.refresh();
