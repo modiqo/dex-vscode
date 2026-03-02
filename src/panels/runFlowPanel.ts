@@ -535,8 +535,6 @@ const MAX_LOG_LINES = 200;
 
 // Spinner chars used by the dex task queue — declared here so all functions can access them
 const SPINNER_CHARS = new Set(['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']);
-// Map of task-name → index in logLines for in-place spinner updates
-const spinnerIdx = {};
 
 function getInputs() {
   return Array.from(document.querySelectorAll('#view-form input[data-name]'));
@@ -592,28 +590,17 @@ function showView(name) {
   });
 }
 
-/** Extract task name from a spinner/completed line: "⠋ fetch-details  0.1s  [running]" */
+/** Extract task name from a spinner/task line: "⠋ fetch-details  0.1s  [running]" → "fetch-details" */
 function spinnerTaskName(line) {
-  // Matches: <spinner-or-checkmark> <task-name>  <duration>  <status>
   const m = line.match(/^[^\s]+\s+([^\s]+)\s+[\d.]+s/);
   return m ? m[1] : null;
 }
 
-function isSpinnerLine(line) {
-  const first = [...line][0]; // first Unicode char
-  return SPINNER_CHARS.has(first);
-}
-
-function isCompletedLine(line) {
-  const first = [...line][0];
-  return first === '✔' || first === '✓' || first === '✗';
-}
-
 function appendLog(text, cls) {
   const box = document.getElementById('log-box');
-  // Handle any stray \r left over (inter-chunk boundaries)
-  const segments = text.split('\r');
-  const lines = segments[segments.length - 1].split('\n');
+  // Split on actual newlines; also handle \r-prefixed spinner chunks
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -621,15 +608,16 @@ function appendLog(text, cls) {
 
     const lineCls = cls || classifyLine(trimmed);
     const taskName = spinnerTaskName(trimmed);
+    const first = [...trimmed][0];
+    const isTaskLine = taskName && (SPINNER_CHARS.has(first) || first === '✔' || first === '✓' || first === '✗');
 
-    if (taskName && (isSpinnerLine(trimmed) || isCompletedLine(trimmed))) {
-      if (spinnerIdx[taskName] !== undefined) {
-        // Update existing entry in-place
-        logLines[spinnerIdx[taskName]] = { text: trimmed, cls: lineCls };
+    if (isTaskLine) {
+      // Find and update existing entry for this task, or add new
+      const existing = logLines.findLastIndex(l => spinnerTaskName(l.text) === taskName);
+      if (existing >= 0) {
+        logLines[existing] = { text: trimmed, cls: lineCls };
       } else {
-        // First time we see this task
         if (logLines.length >= MAX_LOG_LINES) { logLines.shift(); }
-        spinnerIdx[taskName] = logLines.length;
         logLines.push({ text: trimmed, cls: lineCls });
       }
     } else {
@@ -803,7 +791,6 @@ window.addEventListener('message', e => {
   const msg = e.data;
   if (msg.type === 'start') {
     logLines = [];
-    Object.keys(spinnerIdx).forEach(k => delete spinnerIdx[k]);
     showView('running');
     document.getElementById('run-title').textContent = 'Running ' + escHtml(msg.flowName) + '…';
     document.getElementById('run-args').textContent =
