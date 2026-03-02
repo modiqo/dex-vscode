@@ -1281,4 +1281,36 @@ export class DexClient {
 
     return tokens;
   }
+
+  /** Inspect system state and return the first wizard step that is not yet complete */
+  async wizardCheckpoint(): Promise<number> {
+    const home = os.homedir();
+    const access = (p: string) => fs.promises.access(p).then(() => true).catch(() => false);
+
+    const [dexBin, denoBin, whoami, adapters, tokens] = await Promise.all([
+      access(path.join(home, ".local", "bin", "dex")),
+      access(path.join(home, ".dex", "bin", "deno")),
+      this.registryWhoami().catch(() => null),
+      this.adapterList().catch(() => [] as Adapter[]),
+      this.tokenList().catch(() => [] as TokenInfo[]),
+    ]);
+
+    if (!dexBin || !denoBin) return 0;
+    if (!whoami?.email) return 1;
+    if (adapters.length === 0) return 2;
+    if (tokens.filter((t: TokenInfo) => t.configured).length === 0) return 3;
+
+    const wired = await Promise.all([
+      access(path.join(home, ".claude", "skills", "dex", "SKILL.md")),
+      access(path.join(home, ".codex", "skills", "dex", "SKILL.md")),
+      access(path.join(home, ".cursor", "skills", "dex", "SKILL.md")),
+    ]);
+    if (!wired.some(Boolean)) return 4;
+
+    const hasWorkspaces = await fs.promises.readdir(path.join(home, ".dex", "workspaces"))
+      .then(e => e.length > 0).catch(() => false);
+    if (!hasWorkspaces) return 5;
+
+    return 6;
+  }
 }

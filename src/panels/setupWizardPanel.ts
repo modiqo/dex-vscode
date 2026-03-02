@@ -37,6 +37,13 @@ export function showSetupWizardPanel(
   // Load available adapters for step 3
   loadRegistryData(panel, client);
 
+  // Resume at the first incomplete step based on actual system state
+  client.wizardCheckpoint().then(step => {
+    if (step > 0) {
+      panel.webview.postMessage({ type: "resume-at-step", step });
+    }
+  });
+
   panel.webview.onDidReceiveMessage(async (msg) => {
     switch (msg.type) {
       case "login": {
@@ -2143,6 +2150,10 @@ document.addEventListener('mousemove', (e) => {
 window.addEventListener('message', (e) => {
   const msg = e.data;
   switch (msg.type) {
+    case 'resume-at-step':
+      currentStep = msg.step;
+      renderStep();
+      break;
     case 'adapters-available':
       registryAdapters = msg.adapters || [];
       registrySkills = msg.skills || [];
