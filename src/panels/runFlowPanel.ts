@@ -533,6 +533,11 @@ let lastArgs = [];
 let logLines = [];
 const MAX_LOG_LINES = 200;
 
+// Spinner chars used by the dex task queue — declared here so all functions can access them
+const SPINNER_CHARS = new Set(['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']);
+// Map of task-name → index in logLines for in-place spinner updates
+const spinnerIdx = {};
+
 function getInputs() {
   return Array.from(document.querySelectorAll('#view-form input[data-name]'));
 }
@@ -587,11 +592,6 @@ function showView(name) {
   });
 }
 
-// Spinner chars used by the dex task queue
-const SPINNER_CHARS = new Set(['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']);
-// Map of task-name → index in logLines for in-place spinner updates
-const spinnerIdx = {};
-
 /** Extract task name from a spinner/completed line: "⠋ fetch-details  0.1s  [running]" */
 function spinnerTaskName(line) {
   // Matches: <spinner-or-checkmark> <task-name>  <duration>  <status>
@@ -612,8 +612,8 @@ function isCompletedLine(line) {
 function appendLog(text, cls) {
   const box = document.getElementById('log-box');
   // Handle any stray \r left over (inter-chunk boundaries)
-  const segments = text.split('\\r');
-  const lines = segments[segments.length - 1].split('\\n');
+  const segments = text.split('\r');
+  const lines = segments[segments.length - 1].split('\n');
 
   for (const line of lines) {
     const trimmed = line.trim();
