@@ -344,26 +344,24 @@ async function handleProofOfLife(
   client: DexClient,
   adapterIds: string[],
 ): Promise<void> {
-  const results: ProofResult[] = [];
   // Dedup: adapters sharing the same proof flow (e.g. polymarket-data & polymarket-gamma)
-  const seenFlows = new Map<string, ProofResult>();
+  const seenFlows = new Map<string, Promise<ProofResult>>();
 
+  // Mark all as running immediately, then fire in parallel
   for (const id of adapterIds) {
-    panel.webview.postMessage({
-      type: "proof-result",
-      adapter: id,
-      status: "running",
-    });
+    panel.webview.postMessage({ type: "proof-result", adapter: id, status: "running" });
+  }
 
-    // Check if another adapter already ran the same proof flow
+  await Promise.all(adapterIds.map(async (id) => {
     const flowKey = client.proofFlowKey(id);
-    const cached = flowKey ? seenFlows.get(flowKey) : undefined;
-    const result = cached
-      ? { ...cached, adapter: id }
-      : await client.runProofOfLife(id);
-    if (flowKey && !cached) { seenFlows.set(flowKey, result); }
-    results.push(result);
-
+    let resultPromise: Promise<ProofResult>;
+    if (flowKey && seenFlows.has(flowKey)) {
+      resultPromise = seenFlows.get(flowKey)!.then(r => ({ ...r, adapter: id }));
+    } else {
+      resultPromise = client.runProofOfLife(id);
+      if (flowKey) { seenFlows.set(flowKey, resultPromise); }
+    }
+    const result = await resultPromise;
     panel.webview.postMessage({
       type: "proof-result",
       adapter: id,
@@ -371,7 +369,7 @@ async function handleProofOfLife(
       output: result.output,
       error: result.error,
     });
-  }
+  }));
 }
 
 // ── HTML builder ──────────────────────────────────────────────
