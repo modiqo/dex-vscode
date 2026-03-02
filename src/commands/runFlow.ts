@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { DexClient } from "../client/dexClient";
 import { FlowTreeItem } from "../views/flowTree";
+import { parseFlowFrontmatter, showRunFlowPanel } from "../panels/runFlowPanel";
 
 export function registerRunFlow(client: DexClient): vscode.Disposable {
   return vscode.commands.registerCommand(
@@ -27,20 +28,12 @@ export function registerRunFlow(client: DexClient): vscode.Disposable {
           { placeHolder: "Select a flow to run" }
         );
 
-        if (!picked) {
-          return;
-        }
+        if (!picked) { return; }
         flowPath = picked.detail!;
       }
 
-      // Run in integrated terminal
-      const terminal = vscode.window.createTerminal({
-        name: `dex: ${flowPath.split("/").pop()}`,
-      });
-      terminal.show();
-      terminal.sendText(
-        `dex deno run --allow-all "${flowPath}"`
-      );
+      const flowInfo = parseFlowFrontmatter(flowPath);
+      showRunFlowPanel(flowInfo);
     }
   );
 }
