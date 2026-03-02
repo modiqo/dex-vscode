@@ -484,8 +484,8 @@ function buildRunFlowHtml(flow: FlowInfo): string {
   }
 
   <div class="actions">
-    <button class="btn-primary" onclick="submitForm()">▶ Run Flow</button>
-    <button class="btn-ghost" onclick="cancel()">Cancel</button>
+    <button class="btn-primary" id="btn-run">▶ Run Flow</button>
+    <button class="btn-ghost" id="btn-cancel">Cancel</button>
   </div>
 
   <div class="cmd-preview">
@@ -502,7 +502,7 @@ function buildRunFlowHtml(flow: FlowInfo): string {
       <div class="run-title" id="run-title">Running ${escHtml(flow.name)}…</div>
       <div class="run-subtitle" id="run-args"></div>
     </div>
-    <button class="btn-danger" style="margin-left:auto" onclick="killFlow()">Stop</button>
+    <button class="btn-danger" style="margin-left:auto" id="btn-kill">Stop</button>
   </div>
   <div class="log-box" id="log-box"></div>
 </div>
@@ -520,8 +520,8 @@ function buildRunFlowHtml(flow: FlowInfo): string {
   <div id="result-content"></div>
 
   <div class="result-actions">
-    <button class="btn-primary" onclick="runAgain()">▶ Run Again</button>
-    <button class="btn-ghost" onclick="openInTerminal()">Open in Terminal</button>
+    <button class="btn-primary" id="btn-run-again">▶ Run Again</button>
+    <button class="btn-ghost" id="btn-terminal">Open in Terminal</button>
   </div>
 </div>
 
@@ -573,12 +573,13 @@ function submitForm() {
   vscode.postMessage({ type: 'run', args: lastArgs });
 }
 
-function cancel() { vscode.postMessage({ type: 'cancel' }); }
-function killFlow() { vscode.postMessage({ type: 'kill' }); }
-function runAgain() { showView('form'); }
-function openInTerminal() {
+document.getElementById('btn-run').addEventListener('click', submitForm);
+document.getElementById('btn-cancel').addEventListener('click', () => vscode.postMessage({ type: 'cancel' }));
+document.getElementById('btn-kill').addEventListener('click', () => vscode.postMessage({ type: 'kill' }));
+document.getElementById('btn-run-again').addEventListener('click', () => showView('form'));
+document.getElementById('btn-terminal').addEventListener('click', () => {
   vscode.postMessage({ type: 'open-terminal', args: lastArgs, flowPath });
-}
+});
 
 getInputs().forEach(inp => {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitForm(); });
