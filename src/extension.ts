@@ -25,7 +25,7 @@ import { InfoTreeProvider } from "./views/infoTree";
 import { SetupTreeProvider } from "./views/setupTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
 import { showReferencePanel } from "./panels/referencePanel";
-import { showSetupWizardPanel, showInstallPanel } from "./panels/setupWizardPanel";
+import { showSetupWizardPanel, showInstallPanel, showRegistryLoginPanel } from "./panels/setupWizardPanel";
 import { showVaultPullPanel } from "./panels/vaultPullPanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 
@@ -206,59 +206,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("modiqo.refreshRegistry", () => {
       registryTree.refresh();
     }),
-    vscode.commands.registerCommand("modiqo.registryLogin", async () => {
-      const provider = await vscode.window.showQuickPick(
-        [
-          { label: "Google", description: "Login with Google account" },
-          { label: "GitHub", description: "Login with GitHub account" },
-        ],
-        { placeHolder: "Select login provider" }
-      );
-      if (!provider) { return; }
-
-      const providerArg = provider.label.toLowerCase();
-
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: `Logging in with ${provider.label}...`,
-          cancellable: true,
-        },
-        async (_progress, cancellation) => {
-          // Launch login in background (opens browser)
-          const child = client.execStream(["login", "--provider", providerArg]);
-
-          // Poll whoami every 2s to detect successful auth
-          const maxAttempts = 60; // 2 minutes max
-          for (let i = 0; i < maxAttempts; i++) {
-            if (cancellation.isCancellationRequested) {
-              child.kill();
-              return;
-            }
-
-            await new Promise((r) => setTimeout(r, 2000));
-
-            try {
-              const whoami = await client.registryWhoami();
-              if (whoami.status === "valid") {
-                child.kill();
-                registryTree.refresh();
-                vscode.window.showInformationMessage(
-                  `Logged in as ${whoami.email}`
-                );
-                return;
-              }
-            } catch {
-              // whoami failed, keep polling
-            }
-          }
-
-          child.kill();
-          vscode.window.showWarningMessage(
-            "Login timed out. Try refreshing the Registry view."
-          );
-        }
-      );
+    vscode.commands.registerCommand("modiqo.registryLogin", () => {
+      showRegistryLoginPanel(client, () => {
+        registryTree.refresh();
+      });
     }),
     vscode.commands.registerCommand(
       "modiqo.showRegistryDetail",

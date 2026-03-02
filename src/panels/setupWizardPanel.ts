@@ -3205,6 +3205,220 @@ export function showInstallPanel(
   return panel;
 }
 
+// ── Registry Login Panel ─────────────────────────────────────────────────────
+// Shown when registry session expires — same SSO experience as the setup wizard.
+
+let currentLoginPanel: vscode.WebviewPanel | undefined;
+
+export function showRegistryLoginPanel(client: DexClient, onSuccess: () => void): void {
+  if (currentLoginPanel) {
+    currentLoginPanel.reveal();
+    return;
+  }
+
+  const panel = vscode.window.createWebviewPanel(
+    "modiqo.registryLogin",
+    "Sign in to dex Registry",
+    vscode.ViewColumn.One,
+    { enableScripts: true, retainContextWhenHidden: true },
+  );
+
+  currentLoginPanel = panel;
+  panel.onDidDispose(() => { currentLoginPanel = undefined; });
+  panel.webview.html = buildLoginHtml();
+
+  panel.webview.onDidReceiveMessage((msg) => {
+    if (msg.type === "login") {
+      const child = client.execStream(["login", "--provider", msg.provider]);
+      panel.webview.postMessage({ type: "login-status", status: "polling" });
+
+      let attempts = 0;
+      const maxAttempts = 60;
+      const interval = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) {
+          clearInterval(interval);
+          child.kill();
+          panel.webview.postMessage({ type: "login-status", status: "timeout" });
+          return;
+        }
+        try {
+          const whoami = await client.registryWhoami();
+          if (whoami.status === "valid") {
+            clearInterval(interval);
+            child.kill();
+            panel.webview.postMessage({ type: "login-status", status: "success", email: whoami.email });
+            onSuccess();
+            setTimeout(() => panel.dispose(), 1500);
+          }
+        } catch { /* keep polling */ }
+      }, 2000);
+
+      panel.onDidDispose(() => { clearInterval(interval); child.kill(); });
+    }
+  });
+}
+
+function buildLoginHtml(): string {
+  const GOOGLE_SVG = `<svg viewBox="0 0 24 24" width="32" height="32"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`;
+  const GITHUB_SVG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --fg: var(--vscode-foreground);
+    --fg-dim: var(--vscode-descriptionForeground);
+    --bg: var(--vscode-editor-background);
+    --border: var(--vscode-widget-border, #333);
+    --accent: var(--vscode-textLink-foreground);
+    --btn-bg: var(--vscode-button-background);
+    --btn-fg: var(--vscode-button-foreground);
+    --btn-hover: var(--vscode-button-hoverBackground);
+    --card-bg: var(--vscode-editorWidget-background, var(--bg));
+    --success: var(--vscode-testing-iconPassed, #4caf50);
+    --error: var(--vscode-errorForeground, #f44336);
+  }
+  body {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--fg);
+    background: var(--bg);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .container {
+    text-align: center;
+    max-width: 480px;
+    padding: 40px 24px;
+    width: 100%;
+  }
+  .logo {
+    font-size: 1.8em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  .logo span { opacity: 0.45; }
+  .subtitle {
+    color: var(--fg-dim);
+    font-size: 0.9em;
+    margin-bottom: 36px;
+  }
+  .session-badge {
+    display: inline-block;
+    background: color-mix(in srgb, var(--error) 15%, transparent);
+    color: var(--error);
+    border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
+    border-radius: 20px;
+    font-size: 0.78em;
+    padding: 3px 12px;
+    margin-bottom: 28px;
+  }
+  .provider-cards {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .provider-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 28px;
+    cursor: pointer;
+    width: 140px;
+    transition: border-color 0.15s, transform 0.1s;
+    user-select: none;
+  }
+  .provider-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .provider-card .icon { margin-bottom: 10px; }
+  .provider-card .name { font-weight: 600; font-size: 0.95em; }
+  .provider-card .hint { font-size: 0.78em; color: var(--fg-dim); margin-top: 3px; }
+  .status {
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-text { font-size: 0.88em; color: var(--fg-dim); }
+  .success-text { color: var(--success); font-size: 0.9em; }
+  .error-text { color: var(--error); font-size: 0.88em; }
+  .look-up {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.82em; color: var(--fg-dim); margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">modiq<span>o</span> dex</div>
+  <div class="session-badge">Session expired</div>
+  <div class="subtitle">Sign in again to continue accessing the registry.</div>
+  <div class="provider-cards">
+    <div class="provider-card" onclick="doLogin('google')">
+      <div class="icon">${GOOGLE_SVG}</div>
+      <div class="name">Google</div>
+      <div class="hint">Sign in with Google</div>
+    </div>
+    <div class="provider-card" onclick="doLogin('github')">
+      <div class="icon">${GITHUB_SVG}</div>
+      <div class="name">GitHub</div>
+      <div class="hint">Sign in with GitHub</div>
+    </div>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+<script>
+  const vscode = acquireVsCodeApi();
+
+  function doLogin(provider) {
+    document.querySelectorAll('.provider-card').forEach(c => c.style.pointerEvents = 'none');
+    vscode.postMessage({ type: 'login', provider });
+  }
+
+  window.addEventListener('message', (event) => {
+    const msg = event.data;
+    const el = document.getElementById('status');
+    if (msg.type === 'login-status') {
+      if (msg.status === 'polling') {
+        el.innerHTML = '<div class="spinner"></div><div class="status-text">Complete sign-in in your browser...</div><div class="look-up"><span>&#8593;</span> Check your browser window</div>';
+      } else if (msg.status === 'success') {
+        el.innerHTML = '<div class="success-text">&#10003; Signed in as ' + escHtml(msg.email) + '</div>';
+      } else if (msg.status === 'timeout') {
+        el.innerHTML = '<div class="error-text">Login timed out. Please try again.</div>';
+        document.querySelectorAll('.provider-card').forEach(c => c.style.pointerEvents = '');
+      }
+    }
+  });
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>`;
+}
+
 function buildInstallHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">

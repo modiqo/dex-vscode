@@ -980,14 +980,13 @@ export class DexClient {
     }
   }
 
-  /** Check if setup is complete (has adapters, tokens, and skills) */
+  /** Check if setup is complete (dex available + at least one adapter installed) */
   async isSetupComplete(): Promise<boolean> {
     try {
-      const [adapters, tokens] = await Promise.all([
-        this.adapterList(),
-        this.tokenList(),
-      ]);
-      return adapters.length > 0 && tokens.some((t) => t.configured);
+      const available = await this.isAvailable();
+      if (!available) return false;
+      const adapters = await this.adapterList();
+      return adapters.length > 0;
     } catch {
       return false;
     }

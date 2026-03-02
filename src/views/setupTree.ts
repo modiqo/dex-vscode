@@ -66,14 +66,8 @@ export class SetupTreeProvider implements vscode.TreeDataProvider<SetupItem> {
       if (!available) {
         this.status = "not-installed";
       } else {
-        // Check if setup is complete: has adapters + has at least one token
-        const [adapters, tokens] = await Promise.all([
-          this.client.adapterList(),
-          this.client.tokenList(),
-        ]);
-        const hasAdapters = adapters.length > 0;
-        const hasConfiguredTokens = tokens.some((t) => t.configured);
-        this.status = hasAdapters && hasConfiguredTokens ? "complete" : "needs-setup";
+        const complete = await this.client.isSetupComplete();
+        this.status = complete ? "complete" : "needs-setup";
       }
       this.loaded = true;
     }
