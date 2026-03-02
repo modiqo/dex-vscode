@@ -94,6 +94,12 @@
         "icon": "$(cloud-download)"
       },
       {
+        "command": "modiqo.showTour",
+        "title": "How it works",
+        "category": "modiqo",
+        "icon": "$(play-circle)"
+      },
+      {
         "command": "modiqo.showReference",
         "title": "Show Reference",
         "category": "modiqo",

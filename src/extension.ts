@@ -27,6 +27,7 @@ import { showExploreResultsPanel } from "./panels/explorePanel";
 import { showReferencePanel } from "./panels/referencePanel";
 import { showSetupWizardPanel, showInstallPanel, showRegistryLoginPanel } from "./panels/setupWizardPanel";
 import { showVaultPullPanel } from "./panels/vaultPullPanel";
+import { showTourPanel } from "./panels/tourPanel";
 import type { RegistryAdapter, RegistrySkill } from "./client/dexClient";
 import { WorkspaceTreeItem } from "./views/workspaceTree";
 
@@ -203,6 +204,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("modiqo.showPlan", (arg) => {
       showPlanPanel(context.extensionUri, arg instanceof WorkspaceTreeItem ? arg.ws : arg);
+    }),
+    vscode.commands.registerCommand("modiqo.showTour", () => {
+      showTourPanel(context.extensionUri);
     }),
     vscode.commands.registerCommand("modiqo.refreshRegistry", () => {
       registryTree.refresh();

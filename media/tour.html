@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── THEME: dark default ── */
+:root {
+  --bg:       #0d0d10;
+  --fg:       #e8e8e8;
+  --border:   rgba(255,255,255,0.1);
+  --dim:      rgba(232,232,232,0.42);
+  --dimmer:   rgba(232,232,232,0.18);
+  --nav-bg:   rgba(255,255,255,0.04);
+  --mono:     'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace;
+  --sans:     system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --accent-0: #5B8AF5;
+  --accent-1: #9B72F5;
+  --accent-2: #E0752A;
+  --accent-3: #3DB89F;
+  --accent-4: #E8970A;
+  --accent-5: #2EC47A;
+  --err:      #E05252;
+}
+
+/* Light theme — VSCode adds .vscode-light to <body> */
+body.vscode-light {
+  --bg:       #ffffff;
+  --fg:       #1e1e1e;
+  --border:   rgba(0,0,0,0.12);
+  --dim:      rgba(0,0,0,0.48);
+  --dimmer:   rgba(0,0,0,0.24);
+  --nav-bg:   rgba(0,0,0,0.03);
+  --accent-0: #2E6BE6;
+  --accent-1: #7B52D4;
+  --accent-2: #C4600E;
+  --accent-3: #1E9980;
+  --accent-4: #B07000;
+  --accent-5: #1A9E5C;
+  --err:      #C0392B;
+}
+
+/* High-contrast */
+body.vscode-high-contrast {
+  --bg:     #000000;
+  --fg:     #ffffff;
+  --border: #6fc3df;
+  --dim:    rgba(255,255,255,0.7);
+  --dimmer: rgba(255,255,255,0.4);
+  --nav-bg: transparent;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 13px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Code/terminal blocks use monospace */
+.mono, .terminal-block, .cursor,
+#c0-setup-lines, #c0-tools-lines,
+#c1-vault-rows, #c2-left-lines, #c2-right-lines,
+#c3-lines, #c3-right-lines, #c4-ws-lines, #c4-ts-lines,
+#c5-push-lines, #reg-count {
+  font-family: var(--mono);
+}
+
+/* ── LAYOUT ── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ── NAV ── */
+#nav {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  gap: 0;
+  flex-shrink: 0;
+  background: var(--nav-bg);
+}
+
+#nav-logo {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 300;
+  color: #E0752A;
+  letter-spacing: -0.3px;
+  margin-right: 24px;
+  flex-shrink: 0;
+}
+
+#nav-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.nav-tab {
+  height: 40px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #C4600E;
+  opacity: 1;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.nav-tab:hover { color: #E0752A; }
+.nav-tab.active { color: #E0752A; font-weight: 600; border-bottom-color: #E0752A; }
+
+/* ── TERMINAL AREA ── */
+#stage {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.chapter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 60px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.chapter.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── TYPOGRAPHY ATOMS ── */
+.label {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.headline {
+  font-family: var(--sans);
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.4px;
+  line-height: 1.35;
+  color: var(--fg);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.terminal-block {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.9;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.dim-text {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+  line-height: 1.7;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.accent-line {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.big-number {
+  font-size: 64px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.small-label {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+/* revealed state — applied by JS */
+.revealed {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* ── TERMINAL PROMPT ── */
+.prompt { font-weight: 700; }
+.cmd-line { color: var(--fg); }
+.result-line { margin-left: 2px; }
+
+/* terminal cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: currentColor;
+  vertical-align: text-bottom;
+  animation: blink 1.1s step-end infinite;
+}
+
+/* pulse animation for accent lines */
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.pulse { animation: pulse-opacity 2.2s ease-in-out infinite; }
+
+/* spacer */
+.sp { display: block; height: 16px; }
+.sp-sm { display: block; height: 8px; }
+
+/* pull-quote layout for ch0 */
+#ch0-pull {
+  position: absolute;
+  right: 60px;
+  bottom: 80px;
+  text-align: right;
+}
+
+/* section column headers use sans */
+.col-header {
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* ch3 error color */
+.err { color: var(--err); }
+
+/* counting number */
+#reg-count {
+  font-size: 60px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* ── FOOTER ── */
+#footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 24px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--nav-bg);
+}
+
+#footer-counter {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+  min-width: 40px;
+  text-align: center;
+}
+
+.nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 6px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.nav-btn:hover { background: rgba(128,128,128,0.1); border-color: rgba(128,128,128,0.4); }
+.nav-btn:disabled { opacity: 0.22; cursor: default; pointer-events: none; }
+
+#btn-prev { margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- NAV -->
+  <nav id="nav">
+    <div id="nav-logo" style="color:#E0752A !important">modiqo</div>
+    <div id="nav-sep"></div>
+    <div class="nav-tab active" data-ch="0" onclick="goTo(0)" style="color:#E0752A !important">Intro</div>
+    <div class="nav-tab"        data-ch="1" onclick="goTo(1)" style="color:#C4600E !important">Adapters</div>
+    <div class="nav-tab"        data-ch="2" onclick="goTo(2)" style="color:#C4600E !important">Vault</div>
+    <div class="nav-tab"        data-ch="3" onclick="goTo(3)" style="color:#C4600E !important">Command</div>
+    <div class="nav-tab"        data-ch="4" onclick="goTo(4)" style="color:#C4600E !important">Workspace</div>
+    <div class="nav-tab"        data-ch="5" onclick="goTo(5)" style="color:#C4600E !important">Flows</div>
+    <div class="nav-tab"        data-ch="6" onclick="goTo(6)" style="color:#C4600E !important">Registry</div>
+  </nav>
+
+  <!-- STAGE -->
+  <div id="stage">
+
+    <!-- CH 0: INTRO -->
+    <div class="chapter active" id="ch0" style="justify-content:center; padding:60px 80px;">
+
+      <div id="intro-lines" style="display:flex; flex-direction:column; gap:0;">
+
+        <div class="intro-line" id="il0" style="opacity:0; transform:translateY(12px); transition:opacity 0.5s ease, transform 0.5s ease;">
+          <span style="font-size:28px; font-weight:300; line-height:1.55; letter-spacing:-0.01em;">APIs don't speak agent.&nbsp;</span><span onclick="goTo(1)" style="font-size:28px; font-weight:700; color:#E0752A; cursor:pointer; border-bottom:2px solid rgba(224,117,42,0.35); padding-bottom:1px; transition:border-color 0.2s" onmouseenter="this.style.borderBottomColor='#E0752A'" onmouseleave="this.style.borderBottomColor='rgba(224,117,42,0.35)'">dex translates.</span>
+        </div>
+
+        <div class="intro-line" id="il1" style="opacity:0; transform:translateY(12px); transition:opacity 0.5s ease, transform 0.5s ease; margin-top:8px;">
+          <span style="font-size:28px; font-weight:300; line-height:1.55; letter-spacing:-0.01em;">Responses don't belong in context.&nbsp;</span><span onclick="goTo(3)" style="font-size:28px; font-weight:700; color:#E0752A; cursor:pointer; border-bottom:2px solid rgba(224,117,42,0.35); padding-bottom:1px; transition:border-color 0.2s" onmouseenter="this.style.borderBottomColor='#E0752A'" onmouseleave="this.style.borderBottomColor='rgba(224,117,42,0.35)'">dex lands them on disk.</span>
+        </div>
+
+        <div class="intro-line" id="il2" style="opacity:0; transform:translateY(12px); transition:opacity 0.5s ease, transform 0.5s ease; margin-top:8px;">
+          <span style="font-size:28px; font-weight:300; line-height:1.55; letter-spacing:-0.01em;">Sessions shouldn't start from zero.&nbsp;</span><span onclick="goTo(4)" style="font-size:28px; font-weight:700; color:#E0752A; cursor:pointer; border-bottom:2px solid rgba(224,117,42,0.35); padding-bottom:1px; transition:border-color 0.2s" onmouseenter="this.style.borderBottomColor='#E0752A'" onmouseleave="this.style.borderBottomColor='rgba(224,117,42,0.35)'">dex makes them compound.</span>
+        </div>
+
+        <div class="intro-line" id="il3" style="opacity:0; transform:translateY(12px); transition:opacity 0.5s ease, transform 0.5s ease; margin-top:8px;">
+          <span style="font-size:28px; font-weight:300; line-height:1.55; letter-spacing:-0.01em;">Good workflows shouldn't die in one chat.&nbsp;</span><span onclick="goTo(5)" style="font-size:28px; font-weight:700; color:#E0752A; cursor:pointer; border-bottom:2px solid rgba(224,117,42,0.35); padding-bottom:1px; transition:border-color 0.2s" onmouseenter="this.style.borderBottomColor='#E0752A'" onmouseleave="this.style.borderBottomColor='rgba(224,117,42,0.35)'">dex makes them run forever.</span>
+        </div>
+
+      </div>
+
+      <div id="intro-tag" style="opacity:0; transform:translateY(8px); transition:opacity 0.6s ease, transform 0.6s ease; margin-top:48px; padding-top:28px; border-top:1px solid rgba(224,117,42,0.2);">
+        <span style="font-size:13px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#E0752A;">dex</span>
+        <span style="font-size:13px; font-weight:300; letter-spacing:0.06em; color:var(--dim);">&nbsp;·&nbsp; the execution layer agents were missing</span>
+      </div>
+
+    </div>
+
+    <!-- CH 1: ADAPTERS -->
+    <div class="chapter" id="ch1" style="justify-content:flex-start; padding-top:28px;">
+      <div class="label" id="c0-l1" style="color:var(--accent-0); margin-bottom:6px">Adapter Catalog &nbsp;·&nbsp; No Servers. No Infra. No Gateway.</div>
+      <div class="headline" id="c0-h1" style="font-size:22px; margin-bottom:18px; line-height:1.4">Find any API. Use it in seconds.<br><span style="opacity:0.7">Every adapter maps to the same 3 MCP tools.</span></div>
+
+      <div id="c0-cols" style="display:flex; gap:0; flex:1; min-height:0; opacity:0; transition:opacity 0.4s ease; align-items:stretch;">
+
+        <!-- Left: setup journey -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="background:rgba(91,138,245,0.07); border:1px solid rgba(91,138,245,0.2); border-radius:8px 8px 0 0; padding:8px 14px; display:flex; align-items:center; gap:6px; border-bottom:1px solid rgba(91,138,245,0.1);">
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(224,82,82,0.55)"></div>
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(232,151,10,0.5)"></div>
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(61,184,159,0.45)"></div>
+            <span style="margin-left:10px; font-size:10px; letter-spacing:0.07em; color:var(--dim); font-family:var(--mono);">setup</span>
+          </div>
+          <div style="flex:1; background:rgba(91,138,245,0.03); border:1px solid rgba(91,138,245,0.2); border-top:none; border-radius:0 0 8px 8px; padding:16px 18px; overflow:hidden;">
+            <div id="c0-setup-lines" style="font-size:11.5px; line-height:1; font-family:var(--mono);"></div>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div style="display:flex; align-items:center; flex-shrink:0; padding:0 20px;">
+          <div id="c0-div" style="opacity:0; transition:opacity 0.4s ease; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--dim);">then</div>
+        </div>
+
+        <!-- Right: 3 MCP tools + usage -->
+        <div style="flex:1.2; display:flex; flex-direction:column; min-width:0;">
+          <div style="background:rgba(91,138,245,0.07); border:1px solid rgba(91,138,245,0.2); border-radius:8px 8px 0 0; padding:8px 14px; display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(91,138,245,0.1);">
+            <span style="font-size:10px; letter-spacing:0.07em; color:var(--accent-0); font-family:var(--mono);">3 MCP tools · every adapter</span>
+          </div>
+          <div style="flex:1; background:rgba(91,138,245,0.02); border:1px solid rgba(91,138,245,0.2); border-top:none; border-radius:0 0 8px 8px; padding:16px 18px; overflow:hidden;">
+            <div id="c0-tools-lines" style="font-size:11.5px; line-height:1; font-family:var(--mono);"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom stat -->
+      <div id="c0-stat" style="opacity:0; transition:opacity 0.5s ease; margin-top:14px; padding-top:12px; border-top:1px solid rgba(232,232,232,0.07); display:flex; align-items:baseline; gap:16px;">
+        <span style="color:var(--accent-0); font-size:36px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1">160×</span>
+        <span style="color:var(--dim); font-size:11px;">token reduction &nbsp;·&nbsp; agent never loads the raw schema &nbsp;·&nbsp; 500 tokens vs 80,000</span>
+      </div>
+    </div>
+
+    <!-- CH 1: VAULT -->
+    <div class="chapter" id="ch2" style="justify-content:flex-start; padding-top:36px;">
+      <div class="label" id="c1-l1" style="color:var(--accent-1); margin-bottom:6px">Vault &nbsp;·&nbsp; One Encrypted Store. Zero Scatter.</div>
+      <div class="dim-text" id="c1-sub" style="font-size:11px; margin-bottom:22px">&nbsp;&nbsp;tokens live in 4 places before dex. after dex, one.</div>
+
+      <div id="c1-cols" style="display:flex; gap:48px; opacity:0; transition:opacity 0.4s ease; flex:1; min-height:0;">
+
+        <!-- Left: the mess -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--err); margin-bottom:12px; opacity:0.7;">before — scattered</div>
+
+          <div id="c1-mcp-block" style="opacity:0; transition:opacity 0.35s ease; margin-bottom:16px;">
+            <div style="font-size:9px; color:var(--dim); margin-bottom:6px; letter-spacing:0.06em;">~/claude_desktop_config.json</div>
+            <div style="font-size:11px; line-height:1.9; border-left:2px solid rgba(244,71,71,0.3); padding-left:10px; color:var(--dim);">
+              <div><span style="color:var(--err)">"GITHUB_TOKEN"</span>: <span style="color:rgba(244,71,71,0.6)">"ghp_Xk2m…"</span></div>
+              <div><span style="color:var(--err)">"STRIPE_API"</span>: <span style="color:rgba(244,71,71,0.6)">"sk_live_…"</span></div>
+            </div>
+          </div>
+
+          <div id="c1-env-block" style="opacity:0; transition:opacity 0.35s ease; margin-bottom:16px;">
+            <div style="font-size:9px; color:var(--dim); margin-bottom:6px; letter-spacing:0.06em;">~/.env</div>
+            <div style="font-size:11px; line-height:1.9; border-left:2px solid rgba(244,71,71,0.3); padding-left:10px;">
+              <div><span style="color:var(--err)">LINEAR_API</span>=<span style="color:rgba(244,71,71,0.6)">lin_api_…</span></div>
+              <div><span style="color:var(--err)">NOTION_TOKEN</span>=<span style="color:rgba(244,71,71,0.6)">secret_…</span></div>
+            </div>
+          </div>
+
+          <div id="c1-warn-block" style="opacity:0; transition:opacity 0.4s ease; font-size:10px; color:var(--err); line-height:2; opacity:0.7;">
+            <div>⚠ &nbsp;committed to git history</div>
+            <div>⚠ &nbsp;visible in crash reports</div>
+            <div>⚠ &nbsp;shared on screen shares</div>
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div id="c1-arrow" style="display:flex; flex-direction:column; align-items:center; justify-content:center; opacity:0; transition:opacity 0.5s ease; flex-shrink:0;">
+          <div style="color:var(--accent-1); font-size:11px; letter-spacing:0.06em; margin-bottom:6px;">dex vault pull</div>
+          <div style="color:var(--accent-1); font-size:20px;">→</div>
+        </div>
+
+        <!-- Right: the vault -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent-1); margin-bottom:12px;">after — one vault</div>
+
+          <div id="c1-vault-block" style="opacity:0; transition:opacity 0.4s ease; border:1px solid rgba(167,139,250,0.25); border-radius:4px; padding:14px 16px; background:rgba(167,139,250,0.04);">
+            <div style="font-size:9px; color:var(--accent-1); letter-spacing:0.08em; margin-bottom:12px;">~/.dex/vault &nbsp;·&nbsp; AES-256 encrypted</div>
+            <div id="c1-vault-rows" style="font-size:11.5px; line-height:2;"></div>
+          </div>
+
+          <div id="c1-cmd" style="opacity:0; transition:opacity 0.4s ease; margin-top:16px; font-size:11px;">
+            <span style="color:var(--accent-1);">$</span>
+            <span style="color:var(--dim);"> dex vault pull &nbsp;·&nbsp; </span>
+            <span style="color:var(--accent-1);">one command on any machine</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- CH 2: COMMAND -->
+    <div class="chapter" id="ch3" style="justify-content:flex-start; padding-top:28px;">
+      <div class="label" id="c2-l1" style="color:var(--accent-2); margin-bottom:6px">Context Window &nbsp;·&nbsp; Filesystem as Memory</div>
+      <div class="dim-text" id="c2-sub" style="font-size:11px; margin-bottom:18px">&nbsp;&nbsp;every API response that lands in context is tokens burning. dex lands it on disk instead.</div>
+
+      <div id="c2-cols" style="display:flex; gap:40px; flex:1; min-height:0; opacity:0; transition:opacity 0.4s ease;">
+
+        <!-- Left: without dex — context fills up -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--err); margin-bottom:10px; opacity:0.8;">without dex — context fills</div>
+
+          <div id="c2-left-lines" style="font-size:11px; line-height:2; font-family:var(--mono);"></div>
+
+          <div id="c2-ctx-bar-wrap" style="opacity:0; transition:opacity 0.4s ease; margin-top:12px;">
+            <div style="font-size:9px; color:var(--dim); margin-bottom:5px; letter-spacing:0.06em;">context window &nbsp;·&nbsp; 200K tokens</div>
+            <div style="height:7px; background:rgba(224,82,82,0.12); border-radius:2px; overflow:hidden;">
+              <div id="c2-ctx-bar" style="height:100%; width:0%; background:var(--err); border-radius:2px; transition:width 1.2s ease;"></div>
+            </div>
+            <div id="c2-ctx-label" style="font-size:9px; color:var(--err); margin-top:4px; letter-spacing:0.04em; opacity:0; transition:opacity 0.4s ease;"></div>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0;">
+          <div id="c2-vs" style="opacity:0; transition:opacity 0.4s ease; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim);">vs</div>
+        </div>
+
+        <!-- Right: with dex — filesystem absorbs + cross-reference chaining -->
+        <div style="flex:1.3; display:flex; flex-direction:column; min-width:0;">
+          <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent-2); margin-bottom:10px;">with dex — filesystem absorbs</div>
+
+          <!-- Phase 1: responses land on disk as @N refs -->
+          <div id="c2-right-lines" style="font-size:11px; line-height:2; font-family:var(--mono);"></div>
+
+          <!-- Phase 2: cross-reference — @2 value feeds @3 -->
+          <div id="c2-chain-wrap" style="opacity:0; transition:opacity 0.4s ease; margin-top:10px; padding:10px 12px; border:1px solid rgba(224,117,42,0.2); border-radius:4px; background:rgba(224,117,42,0.04);">
+            <div style="font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--accent-2); margin-bottom:8px;">cross-reference · query → extract → inject</div>
+            <div id="c2-chain-lines" style="font-size:11px; line-height:2.1; font-family:var(--mono);"></div>
+          </div>
+
+          <div id="c2-fs-bar-wrap" style="opacity:0; transition:opacity 0.4s ease; margin-top:12px;">
+            <div style="font-size:9px; color:var(--dim); margin-bottom:5px; letter-spacing:0.06em;">context window &nbsp;·&nbsp; 200K tokens</div>
+            <div style="height:7px; background:rgba(61,184,159,0.12); border-radius:2px; overflow:hidden;">
+              <div id="c2-fs-bar" style="height:100%; width:0%; background:var(--accent-3); border-radius:2px; transition:width 1.2s ease;"></div>
+            </div>
+            <div id="c2-fs-label" style="font-size:9px; color:var(--accent-3); margin-top:4px; letter-spacing:0.04em; opacity:0; transition:opacity 0.4s ease;"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom stat -->
+      <div id="c2-stat" style="opacity:0; transition:opacity 0.5s ease; margin-top:12px; padding-top:12px; border-top:1px solid rgba(232,232,232,0.07); display:flex; align-items:baseline; gap:16px;">
+        <span style="color:var(--accent-2); font-size:36px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1">97%</span>
+        <span style="color:var(--dim); font-size:11px;">context pressure removed &nbsp;·&nbsp; data lives on disk &nbsp;·&nbsp; agent holds a reference, not the data</span>
+      </div>
+    </div>
+
+    <!-- CH 3: WORKSPACE -->
+    <div class="chapter" id="ch4" style="justify-content:flex-start; padding-top:28px;">
+      <div class="label" id="c3-l1" style="color:var(--accent-3); margin-bottom:6px">Workspace &nbsp;·&nbsp; Communication as Catalog</div>
+      <div class="dim-text" id="c3-sub" style="font-size:11px; margin-bottom:18px">&nbsp;&nbsp;every call, response, error, and correction — indexed. the agent learns from everything it touches.</div>
+
+      <div id="c3-cols" style="display:flex; gap:32px; flex:1; min-height:0; opacity:0; transition:opacity 0.4s ease;">
+
+        <!-- Left: the catalog accumulates -->
+        <div style="flex:1.4; display:flex; flex-direction:column; min-width:0;">
+          <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; opacity:0.7;">workspace/stripe-receipts &nbsp;·&nbsp; session #4</div>
+          <div id="c3-lines" style="font-size:11px; line-height:1; font-family:var(--mono);"></div>
+        </div>
+
+        <!-- Right: what the catalog enables -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0; padding-left:20px; border-left:1px solid rgba(61,184,159,0.15);">
+          <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent-3); margin-bottom:14px;">what this unlocks</div>
+          <div id="c3-right-lines" style="font-size:11px; line-height:1; font-family:var(--mono);"></div>
+        </div>
+
+      </div>
+
+      <!-- Close statement -->
+      <div id="c3-close" style="opacity:0; transition:opacity 0.6s ease; margin-top:12px; padding-top:12px; border-top:1px solid rgba(61,184,159,0.15); font-size:13px; font-weight:300; color:var(--accent-3); line-height:1.9">
+        &nbsp;&nbsp;the workspace is not a log. it is the primitive.<br>
+        &nbsp;&nbsp;<span style="color:var(--dim); font-size:11px;">every session compounds on every session before it.</span>
+      </div>
+    </div>
+
+    <!-- CH 4: FLOWS -->
+    <div class="chapter" id="ch5" style="justify-content:flex-start; padding-top:28px;">
+      <div class="label" id="c4-l1" style="color:var(--accent-4); margin-bottom:6px">Flows &nbsp;·&nbsp; Workspace → TypeScript</div>
+      <div class="dim-text" id="c4-sub" style="font-size:11px; margin-bottom:18px">&nbsp;&nbsp;every command you ran, crystallized into code that runs forever.</div>
+
+      <div id="c4-cols" style="display:flex; gap:0; opacity:0; transition:opacity 0.4s ease; flex:1; min-height:0; align-items:stretch;">
+
+        <!-- Left: terminal block -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="background:rgba(232,151,10,0.07); border:1px solid rgba(232,151,10,0.2); border-radius:8px 8px 0 0; padding:8px 14px; display:flex; align-items:center; gap:6px; border-bottom:1px solid rgba(232,151,10,0.1);">
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(224,82,82,0.55)"></div>
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(232,151,10,0.5)"></div>
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(61,184,159,0.45)"></div>
+            <span style="margin-left:10px; font-size:10px; letter-spacing:0.07em; color:var(--dim); font-family:var(--mono);">workspace / stripe-receipts</span>
+          </div>
+          <div style="flex:1; background:rgba(232,151,10,0.03); border:1px solid rgba(232,151,10,0.2); border-top:none; border-radius:0 0 8px 8px; padding:16px 18px; overflow:hidden;">
+            <div id="c4-ws-lines" style="font-size:11.5px; line-height:1; font-family:var(--mono);"></div>
+          </div>
+        </div>
+
+        <!-- Divider: centered arrow -->
+        <div style="display:flex; align-items:center; flex-shrink:0; padding:0 22px;">
+          <div id="c4-arrow" style="display:flex; flex-direction:column; align-items:center; gap:5px; opacity:0; transition:opacity 0.5s ease;">
+            <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent-4); white-space:nowrap;">dex flow export</div>
+            <div style="color:var(--accent-4); font-size:30px; line-height:1;">→</div>
+          </div>
+        </div>
+
+        <!-- Right: TypeScript source -->
+        <div style="flex:1.3; display:flex; flex-direction:column; min-width:0;">
+          <div style="background:rgba(155,114,245,0.07); border:1px solid rgba(155,114,245,0.2); border-radius:8px 8px 0 0; padding:8px 14px; display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(155,114,245,0.1);">
+            <span style="font-size:10px; letter-spacing:0.06em; color:var(--accent-1); font-family:var(--mono);">stripe-receipts.ts</span>
+            <span style="font-size:9px; color:var(--dim); margin-left:auto; letter-spacing:0.06em;">TypeScript</span>
+          </div>
+          <div style="flex:1; background:rgba(155,114,245,0.02); border:1px solid rgba(155,114,245,0.2); border-top:none; border-radius:0 0 8px 8px; padding:16px 18px; overflow:hidden;">
+            <div id="c4-ts-lines" style="font-size:11px; line-height:1; font-family:var(--mono);"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer badge -->
+      <div id="c4-badge" style="opacity:0; transition:opacity 0.5s ease; margin-top:14px; padding-top:12px; border-top:1px solid rgba(232,232,232,0.07); display:flex; align-items:center; gap:10px;">
+        <span style="color:var(--accent-4); font-size:10px; letter-spacing:0.06em; font-family:var(--mono);">mcp_8K2nR5Qx</span>
+        <span style="color:var(--dimmer); font-size:10px;">·</span>
+        <span style="color:var(--dim); font-size:10px;">fingerprinted</span>
+        <span style="color:var(--dimmer); font-size:10px;">·</span>
+        <span style="color:var(--dim); font-size:10px;">247 tokens</span>
+        <span style="color:var(--dimmer); font-size:10px;">·</span>
+        <span style="color:var(--dim); font-size:10px;">runs in 2.1s</span>
+        <span style="color:var(--dimmer); font-size:10px;">·</span>
+        <span style="color:var(--accent-5); font-size:10px;">push to share →</span>
+      </div>
+    </div>
+
+    <!-- CH 5: REGISTRY -->
+    <div class="chapter" id="ch6" style="justify-content:flex-start; padding-top:28px;">
+      <div class="label" id="c5-l1" style="color:var(--accent-5); margin-bottom:6px">Registry &nbsp;·&nbsp; GitHub for Adapters &amp; Flows</div>
+      <div class="headline" id="c5-h1" style="font-size:20px; line-height:1.5; margin-bottom:6px">Someone stayed up late building this so you didn't have to.<br><span style="font-size:14px; font-weight:400; opacity:0.7">Push once. Pull anywhere. Share with your team, your org, or the world.</span></div>
+
+      <div id="c5-cols" style="display:flex; gap:32px; flex:1; min-height:0; opacity:0; transition:opacity 0.4s ease; margin-top:16px; align-items:stretch;">
+
+        <!-- Left: concept explanation -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent-5); margin-bottom:12px;">modiqo hub · like github for agents</div>
+
+          <div id="c5-concept-lines" style="font-size:11.5px; line-height:1; font-family:var(--mono);"></div>
+
+          <!-- Token counter -->
+          <div id="c5-count-wrap" style="opacity:0; transition:opacity 0.5s ease; margin-top:auto; padding-top:14px; border-top:1px solid rgba(46,196,122,0.15);">
+            <div style="font-size:9px; color:var(--dim); letter-spacing:0.06em; margin-bottom:6px;">tokens saved collectively this month</div>
+            <div id="c5-number" style="opacity:0; transform:translateY(8px); transition:opacity 0.5s ease, transform 0.5s ease; display:flex; align-items:baseline; gap:14px;">
+              <span id="reg-count" style="color:var(--accent-5); font-family:var(--mono); font-size:48px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums">0</span>
+              <span class="small-label" id="c5-climbing" style="color:var(--dim); font-size:10px">and climbing.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: terminal examples -->
+        <div style="flex:1.2; display:flex; flex-direction:column; min-width:0;">
+          <div style="background:rgba(46,196,122,0.06); border:1px solid rgba(46,196,122,0.18); border-radius:8px 8px 0 0; padding:8px 14px; display:flex; align-items:center; gap:6px; border-bottom:1px solid rgba(46,196,122,0.1);">
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(224,82,82,0.55)"></div>
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(232,151,10,0.5)"></div>
+            <div style="width:9px;height:9px;border-radius:50%;background:rgba(46,196,122,0.5)"></div>
+            <span style="margin-left:10px; font-size:10px; letter-spacing:0.07em; color:var(--dim); font-family:var(--mono);">registry</span>
+          </div>
+          <div style="flex:1; background:rgba(46,196,122,0.02); border:1px solid rgba(46,196,122,0.18); border-top:none; border-radius:0 0 8px 8px; padding:16px 18px; overflow:hidden;">
+            <div id="c5-push-lines" style="font-size:11px; line-height:1; font-family:var(--mono);"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /stage -->
+
+  <!-- FOOTER -->
+  <div id="footer">
+    <div>
+      <button class="nav-btn" id="btn-prev" onclick="prev()" disabled>← Back</button>
+      <button class="nav-btn" id="btn-next" onclick="next()">Next →</button>
+    </div>
+    <div id="footer-counter">1 / 7</div>
+    <div style="width:120px"></div><!-- spacer to balance layout -->
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// THEME SYNC — pick up actual VSCode bg/fg from computed style
+// ─────────────────────────────────────────────────────────────────────────────
+(function syncTheme() {
+  const cs = getComputedStyle(document.body);
+  const vscBg = cs.getPropertyValue('--vscode-editor-background').trim();
+  const vscFg = cs.getPropertyValue('--vscode-editor-foreground').trim();
+  const vscFont = cs.getPropertyValue('--vscode-editor-font-family').trim();
+  const root = document.documentElement;
+  if (vscBg) root.style.setProperty('--bg', vscBg);
+  if (vscFg) root.style.setProperty('--fg', vscFg);
+  if (vscFont) root.style.setProperty('--mono', vscFont);
+
+  // Force nav tab colors via inline style — VSCode injects stylesheets that
+  // override CSS class rules, but inline styles always win.
+  const TAB_DIM    = '#C4600E';
+  const TAB_ACTIVE = '#E0752A';
+  document.querySelectorAll('.nav-tab').forEach(el => {
+    el.style.setProperty('color', TAB_DIM, 'important');
+    el.addEventListener('mouseenter', () => el.style.setProperty('color', TAB_ACTIVE, 'important'));
+    el.addEventListener('mouseleave', () => {
+      el.style.setProperty('color', el.classList.contains('active') ? TAB_ACTIVE : TAB_DIM, 'important');
+    });
+  });
+  // Also set nav logo color
+  const logo = document.getElementById('nav-logo');
+  if (logo) logo.style.setProperty('color', TAB_ACTIVE, 'important');
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const ACCENTS = ['#5B8AF5','#9B72F5','#E0752A','#3DB89F','#E8970A','#2EC47A'];
+let currentChapter = 0;
+let timers = [];
+
+function T(fn, ms) {
+  timers.push(setTimeout(fn, ms));
+}
+function clearAllTimers() {
+  timers.forEach(clearTimeout);
+  timers = [];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────────────────────────────────────
+function goTo(i) {
+  if (i === currentChapter) return;
+  clearAllTimers();
+
+  const outEl = document.getElementById('ch' + currentChapter);
+  outEl.style.transition = 'opacity 0.2s ease';
+  outEl.style.opacity = '0';
+  outEl.style.pointerEvents = 'none';
+
+  // Reset revealed elements in outgoing chapter
+  setTimeout(() => {
+    outEl.classList.remove('active');
+    // Reset all animated children
+    resetChapter(currentChapter);
+
+    currentChapter = i;
+    updateNav();
+
+    const inEl = document.getElementById('ch' + i);
+    inEl.classList.add('active');
+    inEl.style.opacity = '0';
+    inEl.style.transition = 'opacity 0.3s ease';
+    // Force reflow
+    inEl.offsetHeight;
+    inEl.style.opacity = '1';
+
+    // Kick off chapter animation
+    setTimeout(() => PLAYS[i](), 80);
+  }, 210);
+}
+
+function updateNav() {
+  document.querySelectorAll('.nav-tab').forEach((tab, idx) => {
+    const isActive = idx === currentChapter;
+    tab.classList.toggle('active', isActive);
+    const col = isActive ? '#E0752A' : '#C4600E';
+    const wt  = isActive ? '600' : '500';
+    const ul  = isActive ? '#E0752A' : 'transparent';
+    tab.setAttribute('style', 'color:' + col + ' !important; font-weight:' + wt + ' !important; border-bottom-color:' + ul + ' !important;');
+  });
+
+  document.getElementById('footer-counter').textContent = (currentChapter + 1) + ' / 6';
+  document.getElementById('btn-prev').disabled = currentChapter === 0;
+  document.getElementById('btn-next').textContent = currentChapter === 5 ? '✓ Done' : 'Next →';
+}
+
+function prev() { if (currentChapter > 0) goTo(currentChapter - 1); }
+function next() { if (currentChapter < 5) goTo(currentChapter + 1); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   prev();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVEAL HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function reveal(id, delay) {
+  T(() => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('revealed');
+  }, delay);
+}
+
+function revealEl(el, delay) {
+  T(() => {
+    if (el) el.classList.add('revealed');
+  }, delay);
+}
+
+function revealInline(el, delay) {
+  // For elements with inline opacity/transform styles (not using class)
+  T(() => {
+    if (!el) return;
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
+  }, delay);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESET
+// ─────────────────────────────────────────────────────────────────────────────
+function resetChapter(i) {
+  const ch = document.getElementById('ch' + i);
+  if (!ch) return;
+
+  // Remove revealed from all children that have it
+  ch.querySelectorAll('.revealed').forEach(el => el.classList.remove('revealed'));
+
+  // Chapter-specific resets
+  if (i === 0) {
+    ['il0','il1','il2','il3'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.opacity = '0'; el.style.transform = 'translateY(12px)'; }
+    });
+    const tag = document.getElementById('intro-tag');
+    if (tag) { tag.style.opacity = '0'; tag.style.transform = 'translateY(8px)'; }
+  }
+  if (i === 1) {
+    const cols = document.getElementById('c0-cols');
+    if (cols) cols.style.opacity = '0';
+    const d = document.getElementById('c0-div');
+    if (d) d.style.opacity = '0';
+    const setup = document.getElementById('c0-setup-lines');
+    if (setup) setup.innerHTML = '';
+    const tools = document.getElementById('c0-tools-lines');
+    if (tools) tools.innerHTML = '';
+    const stat = document.getElementById('c0-stat');
+    if (stat) stat.style.opacity = '0';
+  }
+  if (i === 2) {
+    const cols = document.getElementById('c1-cols');
+    if (cols) cols.style.opacity = '0';
+    const mcp = document.getElementById('c1-mcp-block');
+    if (mcp) mcp.style.opacity = '0';
+    const env = document.getElementById('c1-env-block');
+    if (env) env.style.opacity = '0';
+    const warn = document.getElementById('c1-warn-block');
+    if (warn) warn.style.opacity = '0';
+    const arrow = document.getElementById('c1-arrow');
+    if (arrow) arrow.style.opacity = '0';
+    const vault = document.getElementById('c1-vault-block');
+    if (vault) vault.style.opacity = '0';
+    const rows = document.getElementById('c1-vault-rows');
+    if (rows) rows.innerHTML = '';
+    const cmd = document.getElementById('c1-cmd');
+    if (cmd) cmd.style.opacity = '0';
+  }
+  if (i === 3) {
+    const cols = document.getElementById('c2-cols');
+    if (cols) cols.style.opacity = '0';
+    const ll = document.getElementById('c2-left-lines');
+    if (ll) ll.innerHTML = '';
+    const rl = document.getElementById('c2-right-lines');
+    if (rl) rl.innerHTML = '';
+    const cbw = document.getElementById('c2-ctx-bar-wrap');
+    if (cbw) cbw.style.opacity = '0';
+    const cb = document.getElementById('c2-ctx-bar');
+    if (cb) cb.style.width = '0%';
+    const cl = document.getElementById('c2-ctx-label');
+    if (cl) { cl.style.opacity = '0'; cl.textContent = ''; }
+    const chw = document.getElementById('c2-chain-wrap');
+    if (chw) chw.style.opacity = '0';
+    const chl = document.getElementById('c2-chain-lines');
+    if (chl) chl.innerHTML = '';
+    const fbw = document.getElementById('c2-fs-bar-wrap');
+    if (fbw) fbw.style.opacity = '0';
+    const fb = document.getElementById('c2-fs-bar');
+    if (fb) fb.style.width = '0%';
+    const fl = document.getElementById('c2-fs-label');
+    if (fl) { fl.style.opacity = '0'; fl.textContent = ''; }
+    const vs = document.getElementById('c2-vs');
+    if (vs) vs.style.opacity = '0';
+    const stat = document.getElementById('c2-stat');
+    if (stat) stat.style.opacity = '0';
+  }
+  if (i === 4) {
+    const cols = document.getElementById('c3-cols');
+    if (cols) cols.style.opacity = '0';
+    const ll = document.getElementById('c3-lines');
+    if (ll) ll.innerHTML = '';
+    const rl = document.getElementById('c3-right-lines');
+    if (rl) rl.innerHTML = '';
+    const close = document.getElementById('c3-close');
+    if (close) close.style.opacity = '0';
+  }
+  if (i === 5) {
+    const ws = document.getElementById('c4-ws-lines');
+    if (ws) ws.innerHTML = '';
+    const ts = document.getElementById('c4-ts-lines');
+    if (ts) ts.innerHTML = '';
+    const cols = document.getElementById('c4-cols');
+    if (cols) cols.style.opacity = '0';
+    const arrow = document.getElementById('c4-arrow');
+    if (arrow) arrow.style.opacity = '0';
+    const badge = document.getElementById('c4-badge');
+    if (badge) badge.style.opacity = '0';
+  }
+  if (i === 6) {
+    const cols = document.getElementById('c5-cols');
+    if (cols) cols.style.opacity = '0';
+    const cl = document.getElementById('c5-concept-lines');
+    if (cl) cl.innerHTML = '';
+    const pl = document.getElementById('c5-push-lines');
+    if (pl) pl.innerHTML = '';
+    const cw = document.getElementById('c5-count-wrap');
+    if (cw) cw.style.opacity = '0';
+    const num = document.getElementById('c5-number');
+    if (num) { num.style.opacity = '0'; num.style.transform = 'translateY(8px)'; }
+    const cnt = document.getElementById('reg-count');
+    if (cnt) cnt.textContent = '0';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LINE APPENDER (for typed terminal blocks)
+// ─────────────────────────────────────────────────────────────────────────────
+function appendLine(containerId, html, delay) {
+  T(() => {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    div.style.opacity = '0';
+    div.style.transform = 'translateY(4px)';
+    div.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    el.appendChild(div);
+    // Force reflow then reveal
+    div.offsetHeight;
+    div.style.opacity = '1';
+    div.style.transform = 'translateY(0)';
+  }, delay);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CH 0 — INTRO — four-line manifesto with orange hyperlinks
+// ─────────────────────────────────────────────────────────────────────────────
+function play0() {
+  // Reveal lines one by one with stagger
+  ['il0','il1','il2','il3'].forEach((id, i) => {
+    T(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    }, 300 + i * 420);
+  });
+  // Tagline at end
+  T(() => {
+    const el = document.getElementById('intro-tag');
+    if (!el) return;
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
+  }, 300 + 4 * 420 + 200);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CH 1 — ADAPTERS — setup journey (left) + 3 MCP tools in use (right)
+// ─────────────────────────────────────────────────────────────────────────────
+function play1() {
+  reveal('c0-l1', 0);
+  reveal('c0-h1', 100);
+
+  const acc = 'var(--accent-0)';
+  const dim = 'var(--dim)';
+  const grn = 'var(--accent-3)';
+  const org = 'var(--accent-2)';
+  const pur = 'var(--accent-1)';
+  const fg  = 'var(--fg)';
+
+  // Show columns
+  T(() => {
+    const cols = document.getElementById('c0-cols');
+    if (cols) cols.style.opacity = '1';
+  }, 300);
+
+  // Show "then" divider
+  T(() => {
+    const d = document.getElementById('c0-div');
+    if (d) d.style.opacity = '1';
+  }, 600);
+
+  // ── LEFT: adapter setup journey ──
+  const setupLines = [
+    // 1. catalog search
+    { html: '<div style="margin-top:2px"><span style="color:' + acc + '; user-select:none">❯ </span><span style="color:' + fg + '">dex adapter catalog</span></div>', delay: 500 },
+    { html: '<div style="padding-left:14px; margin-top:4px; color:' + dim + '">  searching 2,400+ adapters...</div>', delay: 700 },
+    // 2. stripe match
+    { html: '<div style="padding-left:14px; margin-top:6px; display:flex; align-items:baseline; gap:10px"><span style="color:' + acc + '; font-weight:700; font-size:13px">stripe</span><span style="color:' + dim + '; font-size:10px">312 operations · instant</span></div>', delay: 950 },
+    { html: '<div style="padding-left:14px; margin-top:1px; color:' + dim + '; font-size:10px">  github · 1,111 ops &nbsp; notion · 89 ops &nbsp; linear · 54 ops</div>', delay: 1150 },
+    // 3. init prompt
+    { html: '<div style="margin-top:14px"><span style="color:' + acc + '; user-select:none">❯ </span><span style="color:' + fg + '">dex init adapter/stripe</span></div>', delay: 1500 },
+    { html: '<div style="padding-left:14px; margin-top:4px; color:' + org + '">  add your Stripe secret key:</div>', delay: 1750 },
+    { html: '<div style="padding-left:14px; margin-top:3px; color:' + dim + '">  sk_live_  <span style="color:' + fg + '">●●●●●●●●●●●●</span></div>', delay: 2050 },
+    // 4. created
+    { html: '<div style="padding-left:14px; margin-top:6px"><span style="color:' + grn + '">✓</span><span style="color:' + dim + '"> adapter created &amp; indexed</span></div>', delay: 2400 },
+    { html: '<div style="padding-left:14px; margin-top:2px"><span style="color:' + grn + '">✓</span><span style="color:' + dim + '"> token stored in vault</span></div>', delay: 2580 },
+    { html: '<div style="padding-left:14px; margin-top:2px"><span style="color:' + grn + '">✓</span><span style="color:' + dim + '"> 312 operations available via MCP</span></div>', delay: 2760 },
+  ];
+
+  setupLines.forEach(l => appendLine('c0-setup-lines', l.html, l.delay));
+
+  // ── RIGHT: 3 MCP tools in use ──
+  const toolsLines = [
+    // probe
+    { html: '<div style="margin-top:2px; color:' + dim + '; font-size:9px; letter-spacing:0.09em; text-transform:uppercase; margin-bottom:4px">1 · probe — discover schema on demand</div>', delay: 900 },
+    { html: '<div><span style="color:' + acc + '; user-select:none">❯ </span><span style="color:' + fg + '">dex stripe_probe </span><span style="color:' + grn + '">"fetch payables for Feb 2026"</span></div>', delay: 1050 },
+    { html: '<div style="padding-left:14px; margin-top:3px"><span style="color:' + grn + '">@1</span><span style="color:' + dim + '"> saved · schema · 312 ops mapped</span></div>', delay: 1250 },
+    // call
+    { html: '<div style="margin-top:14px; color:' + dim + '; font-size:9px; letter-spacing:0.09em; text-transform:uppercase; margin-bottom:4px">2 · call — execute, response cached as @N</div>', delay: 1600 },
+    { html: '<div><span style="color:' + acc + '; user-select:none">❯ </span><span style="color:' + fg + '">dex stripe_call </span><span style="color:' + grn + '">"GET /v1/invoices?status=open"</span></div>', delay: 1750 },
+    { html: '<div style="padding-left:14px; margin-top:3px"><span style="color:' + grn + '; font-weight:700">@2</span><span style="color:' + dim + '"> saved · 2,847 tokens on disk</span></div>', delay: 1950 },
+    { html: '<div style="padding-left:14px; margin-top:2px; color:' + dim + '; font-size:10px">  { id: "in_1Nj…", amount: 4200, status: "open" }</div>', delay: 2100 },
+    { html: '<div style="padding-left:14px; margin-top:1px; color:' + dim + '; font-size:10px">  { id: "in_9Xk…", amount: 1800, status: "open" } …</div>', delay: 2200 },
+    // batch_call
+    { html: '<div style="margin-top:14px; color:' + dim + '; font-size:9px; letter-spacing:0.09em; text-transform:uppercase; margin-bottom:4px">3 · batch_call — parallel, one round-trip</div>', delay: 2600 },
+    { html: '<div><span style="color:' + acc + '; user-select:none">❯ </span><span style="color:' + fg + '">dex stripe_batch_call </span><span style="color:' + grn + '">"@2 \'$.data[*].id\'"</span></div>', delay: 2750 },
+    { html: '<div style="padding-left:14px; margin-top:3px"><span style="color:' + grn + '; font-weight:700">@3</span><span style="color:' + dim + '"> saved · 2 invoices fetched in parallel</span></div>', delay: 2950 },
+  ];
+
+  toolsLines.forEach(l => appendLine('c0-tools-lines', l.html, l.delay));
+
+  // Bottom stat
+  T(() => {
+    const s = document.getElementById('c0-stat');
+    if (s) s.style.opacity = '1';
+  }, 3200);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CH 1 — VAULT — scattered tokens → one encrypted store
+// ─────────────────────────────────────────────────────────────────────────────
+function play2() {
+  reveal('c1-l1', 0);
+  reveal('c1-sub', 120);
+
+  const acc = 'var(--accent-1)';
+  const dim = 'var(--dim)';
+  const err = 'var(--err)';
+
+  // Show columns
+  T(() => {
+    const cols = document.getElementById('c1-cols');
+    if (cols) cols.style.opacity = '1';
+  }, 300);
+
+  // Left side: mcp block appears
+  T(() => {
+    const b = document.getElementById('c1-mcp-block');
+    if (b) b.style.opacity = '1';
+  }, 500);
+
+  // Left side: env block appears
+  T(() => {
+    const b = document.getElementById('c1-env-block');
+    if (b) b.style.opacity = '1';
+  }, 900);
+
+  // Warning lines flash in
+  T(() => {
+    const b = document.getElementById('c1-warn-block');
+    if (b) { b.style.opacity = '1'; b.style.transition = 'opacity 0.5s ease'; }
+  }, 1300);
+
+  // Arrow appears
+  T(() => {
+    const a = document.getElementById('c1-arrow');
+    if (a) a.style.opacity = '1';
+  }, 1700);
+
+  // Right: vault block appears
+  T(() => {
+    const b = document.getElementById('c1-vault-block');
+    if (b) b.style.opacity = '1';
+  }, 2000);
+
+  // Vault rows appear one by one
+  const vaultRows = [
+    { token: 'GITHUB_TOKEN',  adapter: 'github'  },
+    { token: 'STRIPE_API',    adapter: 'stripe'  },
+    { token: 'LINEAR_API',    adapter: 'linear'  },
+    { token: 'NOTION_TOKEN',  adapter: 'notion'  },
+  ];
+
+  vaultRows.forEach((r, i) => {
+    T(() => {
+      appendLine('c1-vault-rows',
+        `<span style="color:\${acc}">✓ </span>` +
+        `<span style="color:var(--fg); display:inline-block; min-width:120px;">\${r.token}</span>` +
+        `<span style="color:\${dim}">→ \${r.adapter} &nbsp;·&nbsp; ● ● ● ●</span>`,
+        0
+      );
+    }, 2200 + i * 160);
+  });
+
+  // Command line at end
+  T(() => {
+    const c = document.getElementById('c1-cmd');
+    if (c) c.style.opacity = '1';
+  }, 2200 + vaultRows.length * 160 + 300);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CH 2 — COMMAND — filesystem as context
+// ─────────────────────────────────────────────────────────────────────────────
+function play3() {
+  reveal('c2-l1', 0);
+  reveal('c2-sub', 120);
+
+  const err  = 'var(--err)';
+  const acc  = 'var(--accent-2)';
+  const dim  = 'var(--dim)';
+  const fg   = 'var(--fg)';
+  const grn  = 'var(--accent-3)';
+
+  // Show columns
+  T(() => {
+    const cols = document.getElementById('c2-cols');
+    if (cols) cols.style.opacity = '1';
+  }, 300);
+
+  // "vs" divider
+  T(() => {
+    const vs = document.getElementById('c2-vs');
+    if (vs) vs.style.opacity = '1';
+  }, 500);
+
+  // ── LEFT: without dex ──
+  // Each API call dumps raw JSON into context window
+  const leftLines = [
+    `<span style="color:\${dim}; opacity:0.65">$ stripe GET /charges</span>`,
+    `<span style="color:\${err}">  ↳ 2,847 tokens dumped into context</span>`,
+    `<span style="color:\${dim}; opacity:0.65">$ github GET /repos</span>`,
+    `<span style="color:\${err}">  ↳ 4,100 tokens dumped into context</span>`,
+    `<span style="color:\${dim}; opacity:0.65">$ notion GET /pages</span>`,
+    `<span style="color:\${err}">  ↳ 3,600 tokens dumped into context</span>`,
+    `<span style="color:\${err}; opacity:0.75; font-size:10px;">  ✗ 10,547 tokens — context is the bottleneck</span>`,
+  ];
+
+  leftLines.forEach((html, i) => appendLine('c2-left-lines', html, 600 + i * 200));
+
+  // Progress bar fills (red, ~52%)
+  T(() => {
+    const w = document.getElementById('c2-ctx-bar-wrap');
+    if (w) w.style.opacity = '1';
+  }, 600 + leftLines.length * 200 + 100);
+  T(() => {
+    const b = document.getElementById('c2-ctx-bar');
+    if (b) b.style.width = '52%';
+    const l = document.getElementById('c2-ctx-label');
+    if (l) { l.textContent = '52% full — 3 calls in. context is the bottleneck.'; l.style.opacity = '1'; }
+  }, 600 + leftLines.length * 200 + 300);
+
+  // ── RIGHT: with dex ──
+  // Phase 1: Responses land on filesystem as @N files — agent gets tiny references
+  const rightLines = [
+    `<span style="color:\${dim}; opacity:0.65">$ dex GET stripe /charges</span>`,
+    `<span style="color:\${grn}">  ↳ <span style="color:\${acc}; font-weight:700">@1</span> <span style="color:\${dim}">saved &nbsp;·&nbsp; 2,847 tokens on disk</span></span>`,
+    `<span style="color:\${dim}; opacity:0.65">$ dex GET github /repos</span>`,
+    `<span style="color:\${grn}">  ↳ <span style="color:\${acc}; font-weight:700">@2</span> <span style="color:\${dim}">saved &nbsp;·&nbsp; 4,100 tokens on disk</span></span>`,
+    `<span style="color:\${dim}; opacity:0.65">$ dex POST stripe /charges</span>`,
+    `<span style="color:\${grn}">  ↳ <span style="color:\${acc}; font-weight:700">@3</span> <span style="color:\${dim}">saved &nbsp;·&nbsp; 3,600 tokens on disk</span></span>`,
+  ];
+
+  // Stagger right lines alongside left lines
+  rightLines.forEach((html, i) => appendLine('c2-right-lines', html, 600 + i * 200));
+
+  // Phase 2: cross-reference chain — @2 value referenced in @3
+  const chainDelay = 600 + rightLines.length * 200 + 200;
+  T(() => {
+    const w = document.getElementById('c2-chain-wrap');
+    if (w) w.style.opacity = '1';
+  }, chainDelay);
+
+  const chainLines = [
+    `<span style="color:\${dim}; opacity:0.65">$ dex @2 <span style="color:\${acc}">'$.data[0].charge_id'</span></span>`,
+    `<span style="color:\${grn}">  ↳ <span style="color:var(--fg)">"ch_1NjZqz2eZvKYlo2C"</span> <span style="color:\${dim}">&nbsp;·&nbsp; 11μs · filesystem read</span></span>`,
+    `<span style="color:\${dim}; opacity:0.65">$ dex POST stripe /refunds  <span style="color:\${acc}">--from @2</span></span>`,
+    `<span style="color:\${grn}">  ↳ <span style="color:\${acc}; font-weight:700">@4</span> <span style="color:\${dim}">charge_id injected from @2 · no context used</span></span>`,
+  ];
+
+  chainLines.forEach((html, i) => appendLine('c2-chain-lines', html, chainDelay + 200 + i * 220));
+
+  const afterChain = chainDelay + 200 + chainLines.length * 220;
+
+  // Filesystem bar — barely fills (green, ~1%)
+  T(() => {
+    const w = document.getElementById('c2-fs-bar-wrap');
+    if (w) w.style.opacity = '1';
+  }, afterChain + 100);
+  T(() => {
+    const b = document.getElementById('c2-fs-bar');
+    if (b) b.style.width = '1%';
+    const l = document.getElementById('c2-fs-label');
+    if (l) { l.textContent = '< 1% used — queries are deterministic filesystem reads.'; l.style.opacity = '1'; }
+  }, afterChain + 300);
+
+  // Bottom stat
+  T(() => {
+    const stat = document.getElementById('c2-stat');
+    if (stat) stat.style.opacity = '1';
+  }, afterChain + 1000);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CH 3 — WORKSPACE — communication as catalog
+// ─────────────────────────────────────────────────────────────────────────────
+function play4() {
+  reveal('c3-l1', 0);
+  reveal('c3-sub', 120);
+
+  const acc = 'var(--accent-3)';
+  const dim = 'var(--dim)';
+  const err = 'var(--err)';
+  const org = 'var(--accent-2)';
+  const pur = 'var(--accent-1)';
+
+  // Show columns
+  T(() => {
+    const cols = document.getElementById('c3-cols');
+    if (cols) cols.style.opacity = '1';
+  }, 350);
+
+  // Left: catalog entries — each row is a distinct event with breathing room
+  // Using appendLine with extra top-margin on each entry for spacing
+  const catalogEntries = [
+    {
+      html: `<div style="display:flex; gap:8px; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08);">` +
+            `<span style="color:\${acc}; font-weight:700; min-width:24px">@1</span>` +
+            `<span style="color:var(--fg); min-width:100px">GET  /charges</span>` +
+            `<span style="color:\${acc}; margin:0 4px">✓</span>` +
+            `<span style="color:\${dim}; font-size:10px">340ms · 2,847 tokens saved</span>` +
+            `</div>`
+    },
+    {
+      html: `<div style="display:flex; gap:8px; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(224,82,82,0.08);">` +
+            `<span style="color:\${err}; font-weight:700; min-width:24px">@2</span>` +
+            `<span style="color:var(--fg); min-width:100px">POST /refunds</span>` +
+            `<span style="color:\${err}; margin:0 4px">✗</span>` +
+            `<span style="color:\${err}; font-size:10px">401 · missing charge_id</span>` +
+            `</div>`
+    },
+    {
+      html: `<div style="display:flex; gap:8px; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08);">` +
+            `<span style="color:\${acc}; font-weight:700; min-width:24px">@3</span>` +
+            `<span style="color:var(--fg); min-width:100px">POST /refunds</span>` +
+            `<span style="color:\${acc}; margin:0 4px">✓</span>` +
+            `<span style="color:\${org}; font-size:10px">auto-corrected · learned from @2</span>` +
+            `</div>`
+    },
+    {
+      html: `<div style="display:flex; gap:8px; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08);">` +
+            `<span style="color:\${acc}; font-weight:700; min-width:24px">@4</span>` +
+            `<span style="color:var(--fg); min-width:100px">@1 '.data[0].id'</span>` +
+            `<span style="color:\${acc}; margin:0 4px">✓</span>` +
+            `<span style="color:\${dim}; font-size:10px">11μs · filesystem query</span>` +
+            `</div>`
+    },
+    {
+      html: `<div style="display:flex; gap:8px; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08);">` +
+            `<span style="color:\${acc}; font-weight:700; min-width:24px">@5</span>` +
+            `<span style="color:var(--fg); min-width:100px">GET  /balance</span>` +
+            `<span style="color:\${acc}; margin:0 4px">✓</span>` +
+            `<span style="color:\${dim}; font-size:10px">180ms · cached</span>` +
+            `</div>`
+    },
+    {
+      html: `<div style="padding:6px 0; color:\${pur}; font-size:9px; letter-spacing:0.1em; opacity:0.6;">── session #5 ─────────────────────</div>`
+    },
+    {
+      html: `<div style="display:flex; gap:8px; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08);">` +
+            `<span style="color:\${acc}; font-weight:700; min-width:24px">@6</span>` +
+            `<span style="color:var(--fg); min-width:100px">@3 '.refund_id'</span>` +
+            `<span style="color:\${acc}; margin:0 4px">✓</span>` +
+            `<span style="color:\${dim}; font-size:10px">8μs · recalled from session #4</span>` +
+            `</div>`
+    },
+  ];
+
+  catalogEntries.forEach((e, i) => appendLine('c3-lines', e.html, 550 + i * 210));
+
+  // Right: what the catalog enables — appears staggered with breathing room
+  const unlockLines = [
+    { html: `<div style="padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08)"><span style="color:\${acc}; font-weight:600; display:inline-block; min-width:52px">review</span> <span style="color:\${dim}; font-size:10px">inspect any call, any session</span></div>`, delay: 750 },
+    { html: `<div style="padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08)"><span style="color:\${acc}; font-weight:600; display:inline-block; min-width:52px">recall</span> <span style="color:\${dim}; font-size:10px">@N refs span sessions</span></div>`, delay: 1000 },
+    { html: `<div style="padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08)"><span style="color:\${acc}; font-weight:600; display:inline-block; min-width:52px">correct</span> <span style="color:\${dim}; font-size:10px">errors become training data</span></div>`, delay: 1250 },
+    { html: `<div style="padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08)"><span style="color:\${acc}; font-weight:600; display:inline-block; min-width:52px">audit</span> <span style="color:\${dim}; font-size:10px">every decision traceable</span></div>`, delay: 1500 },
+    { html: `<div style="padding:7px 0; border-bottom:1px solid rgba(61,184,159,0.08)"><span style="color:\${acc}; font-weight:600; display:inline-block; min-width:52px">export</span> <span style="color:\${dim}; font-size:10px">catalog becomes a flow</span></div>`, delay: 1750 },
+    { html: `<div style="padding:7px 0"><span style="color:\${acc}; font-weight:600; display:inline-block; min-width:52px">share</span> <span style="color:\${dim}; font-size:10px">push to registry, reuse forever</span></div>`, delay: 2000 },
+  ];
+
+  unlockLines.forEach(l => appendLine('c3-right-lines', l.html, l.delay));
+
+  // Close statement
+  T(() => {
+    const close = document.getElementById('c3-close');
+    if (close) close.style.opacity = '1';
+  }, 550 + catalogEntries.length * 210 + 400);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CH 4 — FLOWS
+// workspace commands → TypeScript code, side by side
+// ─────────────────────────────────────────────────────────────────────────────
+function play5() {
+  reveal('c4-l1', 0);
+  reveal('c4-sub', 120);
+
+  const acc  = 'var(--accent-4)';
+  const dim  = 'var(--dim)';
+  const pur  = 'var(--accent-1)';  // purple for keywords
+  const grn  = 'var(--accent-3)';  // green for strings/types
+  const fg   = 'var(--fg)';
+
+  // Show columns container
+  T(() => {
+    const cols = document.getElementById('c4-cols');
+    if (cols) cols.style.opacity = '1';
+  }, 300);
+
+  // ── LEFT: workspace terminal — colored commands with grouped output ──
+  // Each "command group" = prompt line + result lines, separated by blank spacer
+  const wsGroups = [
+    // GET customers
+    {
+      cmd:  `<div style="margin-top:2px"><span style="color:\${acc}; user-select:none">❯ </span><span style="color:var(--fg)">dex GET stripe /v1/customers</span></div>`,
+      out: [
+        `<div style="padding-left:14px; margin-top:3px"><span style="color:\${grn}; font-weight:700">@1</span><span style="color:\${dim}"> saved &nbsp;·&nbsp; </span><span style="color:\${dim}">1,204 tokens on disk</span></div>`,
+      ]
+    },
+    // POST charge
+    {
+      cmd:  `<div style="margin-top:14px"><span style="color:\${acc}; user-select:none">❯ </span><span style="color:var(--fg)">dex POST stripe /v1/charges</span></div>`,
+      out: [
+        `<div style="padding-left:14px; margin-top:2px"><span style="color:\${dim}">  amount: </span><span style="color:var(--accent-3)">5000</span><span style="color:\${dim}">  currency: </span><span style="color:var(--accent-3)">"usd"</span></div>`,
+        `<div style="padding-left:14px; margin-top:3px"><span style="color:\${grn}; font-weight:700">@2</span><span style="color:\${dim}"> saved &nbsp;·&nbsp; </span><span style="color:\${dim}">892 tokens on disk</span></div>`,
+      ]
+    },
+    // Query @1
+    {
+      cmd:  `<div style="margin-top:14px"><span style="color:\${acc}; user-select:none">❯ </span><span style="color:var(--fg)">dex @1 </span><span style="color:var(--accent-3)">'$.data[0].id'</span></div>`,
+      out: [
+        `<div style="padding-left:14px; margin-top:3px"><span style="color:\${grn}">→ </span><span style="color:var(--fg)">"cus_Nk2mXr4pL8"</span><span style="color:\${dim}"> &nbsp;·&nbsp; 11μs &nbsp;·&nbsp; filesystem read</span></div>`,
+      ]
+    },
+    // export command
+    {
+      cmd:  `<div style="margin-top:14px"><span style="color:\${acc}; user-select:none">❯ </span><span style="color:var(--fg)">dex flow export</span></div>`,
+      out: [
+        `<div style="padding-left:14px; margin-top:3px"><span style="color:\${grn}">✓</span><span style="color:\${dim}"> stripe-receipts.ts written</span></div>`,
+      ]
+    },
+  ];
+
+  // Flatten groups into timed appendLine calls
+  let wsT = 500;
+  wsGroups.forEach(g => {
+    appendLine('c4-ws-lines', g.cmd, wsT);
+    wsT += 160;
+    g.out.forEach(o => {
+      appendLine('c4-ws-lines', o, wsT);
+      wsT += 120;
+    });
+  });
+
+  // Arrow appears when export command shows
+  T(() => {
+    const arrow = document.getElementById('c4-arrow');
+    if (arrow) arrow.style.opacity = '1';
+  }, wsT - 120);
+
+  // ── RIGHT: TypeScript source, line by line with proper indentation + color ──
+  // lnum() must be called at runtime via concatenation, NOT embedded in template literals
+  function lnum(n) {
+    return '<span style="color:' + dim + '; opacity:0.28; user-select:none; display:inline-block;' +
+           ' min-width:20px; text-align:right; margin-right:16px; font-size:10px">' + n + '</span>';
+  }
+  function kw(s)  { return '<span style="color:' + pur  + '">' + s + '</span>'; }
+  function str(s) { return '<span style="color:' + grn  + '">' + s + '</span>'; }
+  function fn(s)  { return '<span style="color:' + acc  + '">' + s + '</span>'; }
+  function cm(s)  { return '<span style="color:' + dim  + '; opacity:0.55">' + s + '</span>'; }
+  function tx(s)  { return '<span style="color:var(--fg)">' + s + '</span>'; }
+  function row(n, content) { return '<div style="padding:2px 0">' + lnum(n) + content + '</div>'; }
+
+  const tsLines = [
+    row(1,  kw('import') + tx(' { dex } ') + kw('from') + tx(' ') + str('"@dex-sdk/core"') + tx(';')),
+    row(2,  ''),
+    row(3,  cm('/** @dex-frontmatter adapter: stripe */')),
+    row(4,  kw('export async function ') + fn('stripeReceipts') + tx('(')),
+    row(5,  tx('  amount: ') + str('number') + tx(', currency: ') + str('string')),
+    row(6,  tx(') {')),
+    row(7,  tx('  ') + kw('const') + tx(' customers = ') + kw('await') + tx(' dex.') + fn('call') + tx('(')),
+    row(8,  tx('    ') + str('"stripe"') + tx(', ') + str('"GET /v1/customers"')),
+    row(9,  tx('  );')),
+    row(10, tx('  ') + kw('return await') + tx(' dex.') + fn('call') + tx('(')),
+    row(11, tx('    ') + str('"stripe"') + tx(', ') + str('"POST /v1/charges"') + tx(',')),
+    row(12, tx('    { amount, currency }')),
+    row(13, tx('  );')),
+    row(14, tx('}')),
+  ];
+
+  tsLines.forEach((html, i) => appendLine('c4-ts-lines', html, 700 + i * 130));
+
+  // Badge at the end
+  T(() => {
+    const badge = document.getElementById('c4-badge');
+    if (badge) badge.style.opacity = '1';
+  }, 700 + tsLines.length * 130 + 400);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CH 5 — REGISTRY
+// ─────────────────────────────────────────────────────────────────────────────
+function play6() {
+  reveal('c5-l1', 0);
+  reveal('c5-h1', 120);
+
+  const grn = 'var(--accent-5)';
+  const dim = 'var(--dim)';
+  const acc = 'var(--accent-0)';
+  const org = 'var(--accent-2)';
+  const fg  = 'var(--fg)';
+
+  // Show columns
+  T(() => {
+    const cols = document.getElementById('c5-cols');
+    if (cols) cols.style.opacity = '1';
+  }, 350);
+
+  // ── LEFT: concept — modiqo hub as GitHub for agents ──
+  const conceptLines = [
+    // Analogy block
+    { html: '<div style="margin-top:2px; color:' + dim + '; font-size:10px; padding:8px 10px; border:1px solid rgba(46,196,122,0.15); border-radius:4px; line-height:1.7; background:rgba(46,196,122,0.03)">' +
+            '<span style="color:' + grn + '; font-weight:600">modiqo hub</span> is to dex what GitHub is to code.<br>' +
+            'Push adapters and flows. Pull from teammates.<br>' +
+            'Private to your org, or open to the community.' +
+            '</div>', delay: 500 },
+    // Scopes
+    { html: '<div style="margin-top:16px; color:' + dim + '; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px">access scopes</div>', delay: 800 },
+    { html: '<div style="padding:5px 0; border-bottom:1px solid rgba(46,196,122,0.08); display:flex; gap:8px">' +
+            '<span style="color:' + grn + '; min-width:70px; font-weight:600">private</span>' +
+            '<span style="color:' + dim + '; font-size:10px">your org only · teams + RBAC · audit log</span></div>', delay: 950 },
+    { html: '<div style="padding:5px 0; border-bottom:1px solid rgba(46,196,122,0.08); display:flex; gap:8px">' +
+            '<span style="color:' + acc + '; min-width:70px; font-weight:600">team</span>' +
+            '<span style="color:' + dim + '; font-size:10px">shared within your org team · discoverable internally</span></div>', delay: 1100 },
+    { html: '<div style="padding:5px 0; display:flex; gap:8px">' +
+            '<span style="color:' + org + '; min-width:70px; font-weight:600">public</span>' +
+            '<span style="color:' + dim + '; font-size:10px">open to the community · versioned · searchable</span></div>', delay: 1250 },
+    // Agent-to-agent
+    { html: '<div style="margin-top:16px; color:' + dim + '; font-size:9px; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px">agents ↔ subagents</div>', delay: 1500 },
+    { html: '<div style="padding:5px 0; color:' + dim + '; font-size:10px; line-height:1.7">' +
+            'Flows can be pulled by agents at runtime —<br>' +
+            '<span style="color:' + grn + '">dex registry adapter pull my-org/gmail-adapter</span><br>' +
+            'and composed as subagents in orchestration.' +
+            '</div>', delay: 1650 },
+  ];
+
+  conceptLines.forEach(l => appendLine('c5-concept-lines', l.html, l.delay));
+
+  // ── RIGHT: terminal — register, push, search, pull ──
+  const termLines = [
+    // register + login
+    { html: '<div style="margin-top:2px"><span style="color:' + grn + '">❯ </span><span style="color:' + fg + '">dex registry register</span></div>', delay: 600 },
+    { html: '<div style="padding-left:14px; margin-top:3px"><span style="color:' + grn + '">✓</span><span style="color:' + dim + '"> account created on modiqo hub</span></div>', delay: 780 },
+    { html: '<div style="margin-top:12px"><span style="color:' + grn + '">❯ </span><span style="color:' + fg + '">dex registry org create --slug acme --name "Acme Corp"</span></div>', delay: 1000 },
+    { html: '<div style="padding-left:14px; margin-top:3px"><span style="color:' + grn + '">✓</span><span style="color:' + dim + '"> org created · private registry ready</span></div>', delay: 1180 },
+    // push adapter
+    { html: '<div style="margin-top:12px; color:' + dim + '; font-size:9px; letter-spacing:0.09em; text-transform:uppercase; margin-bottom:4px">publish your adapter</div>', delay: 1400 },
+    { html: '<div><span style="color:' + grn + '">❯ </span><span style="color:' + fg + '">dex registry adapter push gmail.adapt acme</span></div>', delay: 1550 },
+    { html: '<div style="padding-left:14px; margin-top:3px"><span style="color:' + grn + '">✓</span><span style="color:' + dim + '"> pushed acme/gmail · versioned · indexed</span></div>', delay: 1730 },
+    // search + pull
+    { html: '<div style="margin-top:12px; color:' + dim + '; font-size:9px; letter-spacing:0.09em; text-transform:uppercase; margin-bottom:4px">your teammate, next morning</div>', delay: 2000 },
+    { html: '<div><span style="color:' + grn + '">❯ </span><span style="color:' + fg + '">dex registry adapter search </span><span style="color:' + acc + '">"gmail"</span><span style="color:' + fg + '"> --org acme</span></div>', delay: 2150 },
+    { html: '<div style="padding-left:14px; margin-top:3px; color:' + dim + '; font-size:10px">  acme/gmail-adapter · v1.2 · 89 operations · ★ 14</div>', delay: 2300 },
+    { html: '<div style="margin-top:6px"><span style="color:' + grn + '">❯ </span><span style="color:' + fg + '">dex registry adapter pull acme/gmail-adapter</span></div>', delay: 2480 },
+    { html: '<div style="padding-left:14px; margin-top:3px"><span style="color:' + grn + '">✓</span><span style="color:' + dim + '"> pulled · token injected from vault · ready</span></div>', delay: 2660 },
+  ];
+
+  termLines.forEach(l => appendLine('c5-push-lines', l.html, l.delay));
+
+  // Token counter
+  const counterDelay = 2900;
+  T(() => {
+    const w = document.getElementById('c5-count-wrap');
+    if (w) w.style.opacity = '1';
+    revealInline(document.getElementById('c5-number'), 200);
+
+    T(() => {
+      const target = 1847392;
+      const duration = 2000;
+      const start = performance.now();
+      function tick() {
+        const elapsed = performance.now() - start;
+        const pct = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - pct, 3);
+        const el = document.getElementById('reg-count');
+        if (el) el.textContent = Math.round(eased * target).toLocaleString();
+        if (pct < 1) requestAnimationFrame(tick);
+      }
+      tick();
+    }, 400);
+  }, counterDelay);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAYS MAP
+// ─────────────────────────────────────────────────────────────────────────────
+const PLAYS = [play0, play1, play2, play3, play4, play5, play6];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+updateNav();
+T(() => play0(), 150);
+</script>
+</html>

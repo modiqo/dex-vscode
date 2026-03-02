@@ -80,6 +80,11 @@ export class SetupTreeProvider implements vscode.TreeDataProvider<SetupItem> {
             description: "Download and install",
             commandId: "modiqo.installDex",
           }),
+          new SetupItem("action", "How it works", {
+            icon: "play-circle",
+            description: "Visual tour",
+            commandId: "modiqo.showTour",
+          }),
         ];
 
       case "needs-setup":
@@ -89,6 +94,11 @@ export class SetupTreeProvider implements vscode.TreeDataProvider<SetupItem> {
             description: "Configure adapters and auth",
             commandId: "modiqo.openSetupWizard",
           }),
+          new SetupItem("action", "How it works", {
+            icon: "play-circle",
+            description: "Visual tour",
+            commandId: "modiqo.showTour",
+          }),
         ];
 
       case "complete":
@@ -96,6 +106,11 @@ export class SetupTreeProvider implements vscode.TreeDataProvider<SetupItem> {
           new SetupItem("status", "Setup complete", {
             icon: "check",
             description: "All configured",
+          }),
+          new SetupItem("action", "How it works", {
+            icon: "play-circle",
+            description: "Visual tour",
+            commandId: "modiqo.showTour",
           }),
         ];
     }
