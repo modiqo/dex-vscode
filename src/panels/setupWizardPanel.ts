@@ -105,6 +105,7 @@ export function showSetupWizardPanel(
             type: "vault-pull-status",
             success: true,
             message: "Vault pulled — tokens restored",
+            vaultTokens: freshVault,
           });
         } else {
           panel.webview.postMessage({
@@ -2617,7 +2618,7 @@ function renderTokenStep(vaultTokens) {
         <div class="vault-title">Pull from Vault</div>
         <div class="vault-desc muted">Restore encrypted tokens from the dex registry vault.</div>
       </div>
-      <button class="btn btn-secondary" onclick="showPassphraseModal()" id="vaultPullBtn">Pull Vault</button>
+      <button class="btn btn-primary" onclick="showPassphraseModal()" id="vaultPullBtn" style="min-width:110px;">Pull Vault &#x1F513;</button>
     </div>
     <div id="vaultPullStatus"></div>
   \`;
@@ -2767,7 +2768,7 @@ function handleVaultPullStatus(msg) {
     if (vaultCard) {
       vaultCard.classList.add('vault-success');
       const btn = document.getElementById('vaultPullBtn');
-      if (btn) { btn.textContent = 'Pulled'; btn.disabled = true; btn.classList.add('btn-success-done'); }
+      if (btn) { btn.textContent = 'Pulled \u2713'; btn.disabled = true; btn.classList.add('btn-success-done'); }
     }
     statusEl.innerHTML = \`
       <div class="vault-status-banner success" style="flex-direction:column; align-items:center; text-align:center;">
@@ -2779,6 +2780,20 @@ function handleVaultPullStatus(msg) {
         <div class="vault-status-hint muted">Tokens below have been updated from the vault.</div>
       </div>
     \`;
+    var expiredTokens = (msg.vaultTokens || []).filter(function(t) { return t.expires_in === 'expired'; });
+    if (expiredTokens.length > 0) {
+      var warn = document.createElement('div');
+      warn.style.cssText = 'margin-top:10px;padding:10px 14px;background:rgba(244,71,71,0.08);border:1px solid var(--error);border-radius:8px;';
+      var warnTitle = document.createElement('div');
+      warnTitle.style.cssText = 'font-size:12px;font-weight:600;color:var(--error);margin-bottom:6px;';
+      warnTitle.textContent = expiredTokens.length + ' token' + (expiredTokens.length > 1 ? 's' : '') + ' may be expired';
+      var warnBody = document.createElement('div');
+      warnBody.style.cssText = 'font-size:11px;color:var(--fg-dim);line-height:1.5;';
+      warnBody.textContent = expiredTokens.map(function(t) { return t.name; }).join(', ') + ' — consider refreshing below.';
+      warn.appendChild(warnTitle);
+      warn.appendChild(warnBody);
+      statusEl.appendChild(warn);
+    }
   } else {
     statusEl.innerHTML = \`
       <div class="vault-status-banner error">
