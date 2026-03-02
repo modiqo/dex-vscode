@@ -196,7 +196,71 @@ export class AdapterTreeProvider
     if (a.success) { rows.push(this.detailRow(a, `Success: ${a.success}`)); }
     if (a.group) { rows.push(this.detailRow(a, `Group: ${a.group}`)); }
     rows.push(this.detailRow(a, a.has_token ? "Status: ready" : "Status: token missing"));
+
+    // Auth token info from manifest
+    const authInfo = this.readAuthInfoFromManifest(a.id);
+    if (authInfo) {
+      const item = this.detailRow(a, `Auth token: ${authInfo.envVar}`);
+      item.tooltip = authInfo.description
+        ? `${authInfo.label}\n${authInfo.description}`
+        : authInfo.label;
+      rows.push(item);
+    }
+
     return rows;
+  }
+
+  /** Read auth token env var name from adapter manifest.json */
+  private readAuthInfoFromManifest(
+    adapterId: string
+  ): { envVar: string; label: string; description?: string } | undefined {
+    const manifestPath = path.join(
+      os.homedir(), ".dex", "adapters", adapterId, "manifest.json"
+    );
+    try {
+      const content = fs.readFileSync(manifestPath, "utf-8");
+      const manifest = JSON.parse(content);
+      const auth = manifest?.auth;
+      if (!auth) { return undefined; }
+
+      // No-auth APIs
+      if (auth.type === "none") { return undefined; }
+
+      // Simple auth: top-level token_env or key_env
+      if (auth.token_env) {
+        return { envVar: auth.token_env, label: "Bearer token", description: auth.description };
+      }
+      if (auth.key_env) {
+        return { envVar: auth.key_env, label: "API key", description: auth.description };
+      }
+
+      // Per-operation auth: use default scheme
+      const defaultScheme = auth.default_scheme;
+      if (defaultScheme && auth.schemes?.[defaultScheme]) {
+        const scheme = auth.schemes[defaultScheme];
+        if (scheme.token_env) {
+          return { envVar: scheme.token_env, label: `Bearer token (${defaultScheme})`, description: scheme.description };
+        }
+        if (scheme.key_env) {
+          return { envVar: scheme.key_env, label: `API key (${defaultScheme})`, description: scheme.description };
+        }
+      }
+
+      // Multi-scheme without default: show first available
+      if (auth.schemes) {
+        for (const [schemeName, scheme] of Object.entries(auth.schemes as Record<string, { token_env?: string; key_env?: string; description?: string }>)) {
+          if (scheme.token_env) {
+            return { envVar: scheme.token_env, label: `Bearer token (${schemeName})`, description: scheme.description };
+          }
+          if (scheme.key_env) {
+            return { envVar: scheme.key_env, label: `API key (${schemeName})`, description: scheme.description };
+          }
+        }
+      }
+    } catch {
+      // Manifest unreadable — skip
+    }
+    return undefined;
   }
 
   // ── Log rows ────────────────────────────────────────────────────
