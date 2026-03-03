@@ -546,7 +546,7 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       <div class="select-actions">
         <a onclick="selectAll()">Select All</a>
         <a onclick="selectNone()">Select None</a>
-        <a onclick="selectReadOnly()">Read-only Only</a>
+        <a onclick="selectReadOnly()">Select Read-only</a>
         &nbsp;|&nbsp;
         <a onclick="setAllAccessLevel('all')">All R+W</a>
         <a onclick="setAllAccessLevel('read-only')">All Read-only</a>
@@ -703,13 +703,25 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       // Summary
       const s = data.summary;
       const summaryEl = document.getElementById('rv-summary');
+      const isGraphQL = data.spec && data.spec.openapi_version && data.spec.openapi_version.startsWith('graphql');
+      let methodPills = '';
+      if (isGraphQL) {
+        const reads = s.read_operations || 0;
+        const writes = s.write_operations || 0;
+        methodPills =
+          '<span class="stat-pill">Query: ' + reads + '</span>' +
+          '<span class="stat-pill">Mutation: ' + writes + '</span>';
+      } else {
+        methodPills =
+          '<span class="stat-pill">GET: ' + s.get_operations + '</span>' +
+          '<span class="stat-pill">POST: ' + s.post_operations + '</span>' +
+          '<span class="stat-pill">PUT: ' + s.put_operations + '</span>' +
+          '<span class="stat-pill">DELETE: ' + s.delete_operations + '</span>';
+      }
       summaryEl.innerHTML =
         '<span class="stat-pill">' + s.total_toolsets + ' toolsets</span>' +
         '<span class="stat-pill">' + s.total_tools + ' tools</span>' +
-        '<span class="stat-pill">GET: ' + s.get_operations + '</span>' +
-        '<span class="stat-pill">POST: ' + s.post_operations + '</span>' +
-        '<span class="stat-pill">PUT: ' + s.put_operations + '</span>' +
-        '<span class="stat-pill">DELETE: ' + s.delete_operations + '</span>' +
+        methodPills +
         '<div style="margin-top:8px;font-size:0.82em;color:var(--fg-dim)">Detection: ' + escHtml(data.detection_method) + '</div>';
 
       // Pre-fill base URL override
@@ -922,14 +934,22 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       let html = '<table class="toolset-table">';
       html += '<tr><th style="width:30px"></th><th>Toolset</th><th>Tools</th><th>Methods</th><th>Access Level</th></tr>';
 
+      const isGraphQL = dryRunData.spec && dryRunData.spec.openapi_version && dryRunData.spec.openapi_version.startsWith('graphql');
+
       toolsets.forEach((t, i) => {
         const methods = t.methods || {};
-        const readCount = methods['GET'] || 0;
-        const writeCount = t.tool_count - readCount;
+        // Use semantic read/write counts when available (GraphQL-aware)
+        const readCount = (t.read_operations != null) ? t.read_operations : (methods['GET'] || 0);
+        const writeCount = (t.write_operations != null) ? t.write_operations : (t.tool_count - readCount);
         let methodBadges = '';
-        for (const [m, count] of Object.entries(methods)) {
-          const cls = 'method-' + m.toLowerCase();
-          methodBadges += '<span class="method-badge ' + cls + '">' + m + ':' + count + '</span>';
+        if (isGraphQL) {
+          if (readCount > 0) methodBadges += '<span class="method-badge method-get">Query:' + readCount + '</span>';
+          if (writeCount > 0) methodBadges += '<span class="method-badge method-post">Mutation:' + writeCount + '</span>';
+        } else {
+          for (const [m, count] of Object.entries(methods)) {
+            const cls = 'method-' + m.toLowerCase();
+            methodBadges += '<span class="method-badge ' + cls + '">' + m + ':' + count + '</span>';
+          }
         }
 
         // Determine sensible default: if all read → read-only, if all write → write-only
@@ -988,8 +1008,14 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       document.querySelectorAll('.toolset-table input[type="checkbox"]').forEach(cb => {
         const idx = parseInt(cb.dataset.idx);
         const t = dryRunData.toolsets[idx];
-        const methods = Object.keys(t.methods || {});
-        cb.checked = methods.every(m => m === 'GET');
+        if (t.read_operations != null) {
+          // Semantic: select toolsets that are entirely read operations
+          cb.checked = t.read_operations > 0 && t.write_operations === 0;
+        } else {
+          // Fallback: HTTP method check
+          const methods = Object.keys(t.methods || {});
+          cb.checked = methods.every(m => m === 'GET');
+        }
       });
       updateToolsetSummary();
     }
