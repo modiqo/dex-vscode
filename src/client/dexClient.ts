@@ -401,10 +401,22 @@ export class DexClient {
   /** Get token list — parses text output until --output=json is added */
   async tokenList(): Promise<TokenInfo[]> {
     try {
-      const text = await this.execText(["token", "list"]);
-      return this.parseTokenListText(text);
+      const text = await this.execText(["token", "list", "--json"]);
+      // New JSON format: array of { name, type, expires_in, ... }
+      const arr = JSON.parse(text) as Array<{ name: string; type: string; expires_in?: string | null }>;
+      return arr.map(t => ({
+        env_var: t.name,
+        adapter_id: "",
+        configured: true, // presence in list means configured
+      }));
     } catch {
-      return [];
+      // Fallback to text parser for older binary versions
+      try {
+        const text = await this.execText(["token", "list"]);
+        return this.parseTokenListText(text);
+      } catch {
+        return [];
+      }
     }
   }
 
