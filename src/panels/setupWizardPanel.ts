@@ -50,6 +50,20 @@ export function showSetupWizardPanel(
         handleLogin(panel, client, msg.provider);
         break;
       }
+      case "waitlist": {
+        const result = await client.waitlist(msg.email);
+        panel.webview.postMessage({ type: "waitlist-status", ...result });
+        break;
+      }
+      case "join-invite": {
+        const result = await client.joinInvite(msg.code);
+        panel.webview.postMessage({ type: "join-status", ...result });
+        if (result.success) {
+          // Reload registry data now that invite is claimed
+          loadRegistryData(panel, client);
+        }
+        break;
+      }
       case "install-adapters": {
         await handleInstallAdapters(panel, client, msg.adapters);
         // Start daemon after adapters are installed (needed for proof-of-life)
@@ -994,6 +1008,141 @@ body.vscode-light .install-bar { background: rgba(255, 255, 255, 0.92); backdrop
 .provider-card .hint {
   font-size: 12px;
   opacity: 0.5;
+}
+
+/* ── Journey sections (waitlist / invite / sign-in) ── */
+
+.journey-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.journey-section {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.journey-section:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--card-border));
+}
+
+.journey-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.journey-header:hover { opacity: 0.9; }
+
+.journey-step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.journey-step-info { flex: 1; }
+
+.journey-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.journey-step-hint {
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.journey-chevron {
+  font-size: 10px;
+  opacity: 0.4;
+  transition: transform 0.2s;
+}
+
+.journey-body {
+  padding: 0 20px 20px;
+  animation: journey-expand 0.2s ease;
+}
+
+.journey-body.collapsed {
+  display: none;
+}
+
+@keyframes journey-expand {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.journey-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.journey-input {
+  flex: 1;
+  background: var(--vscode-input-background, rgba(255,255,255,0.06));
+  color: var(--fg);
+  border: 1px solid var(--vscode-input-border, var(--card-border));
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.journey-input:focus {
+  border-color: var(--accent);
+}
+
+.journey-input.input-error {
+  border-color: var(--error);
+}
+
+.journey-input::placeholder {
+  opacity: 0.35;
+}
+
+.journey-field-hint {
+  font-size: 11px;
+  opacity: 0.4;
+  margin-top: 8px;
+  padding-left: 2px;
+}
+
+.journey-success {
+  color: var(--success);
+  font-size: 13px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  border-radius: 6px;
+}
+
+.journey-error {
+  color: var(--error);
+  font-size: 13px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+  border-radius: 6px;
 }
 
 /* ── Adapter selection cards ─────────────── */
@@ -2185,6 +2334,12 @@ window.addEventListener('message', (e) => {
     case 'vault-pull-status':
       handleVaultPullStatus(msg);
       break;
+    case 'waitlist-status':
+      handleWaitlistStatus(msg);
+      break;
+    case 'join-status':
+      handleJoinStatus(msg);
+      break;
   }
 });
 
@@ -2282,25 +2437,184 @@ function renderLogin(el) {
   }
 
   el.innerHTML = \`
-    <h2>Sign in to dex Registry</h2>
-    <div class="subtitle">Connect your account to access adapters and flows.</div>
-    <div class="provider-cards">
-      <div class="provider-card glow-card" onclick="doLogin('google')">
-        <div class="icon">\${GOOGLE_SVG}</div>
-        <div class="name">Google</div>
-        <div class="hint">Sign in with Google</div>
+    <div class="journey-page">
+      <!-- Section 1: Join the Waitlist -->
+      <div class="journey-section" id="sect-waitlist">
+        <div class="journey-header" onclick="toggleSection('waitlist')">
+          <div class="journey-step-num">1</div>
+          <div class="journey-step-info">
+            <div class="journey-step-title">Join the waitlist</div>
+            <div class="journey-step-hint">New here? Request early access</div>
+          </div>
+          <div class="journey-chevron" id="chevron-waitlist">\\u25BC</div>
+        </div>
+        <div class="journey-body" id="body-waitlist">
+          <div class="journey-input-row">
+            <input type="email" id="waitlistEmail" class="journey-input" placeholder="you@company.com" autocomplete="email" />
+            <button class="btn btn-primary" id="waitlistBtn" onclick="submitWaitlist()">Request Access</button>
+          </div>
+          <div class="journey-field-hint" id="waitlistHint">Check your email (and spam folder) within the next 7 days</div>
+          <div id="waitlistStatus"></div>
+        </div>
       </div>
-      <div class="provider-card glow-card" onclick="doLogin('github')">
-        <div class="icon">\${GITHUB_SVG}</div>
-        <div class="name">GitHub</div>
-        <div class="hint">Sign in with GitHub</div>
+
+      <!-- Section 2: Claim your Invite -->
+      <div class="journey-section" id="sect-invite">
+        <div class="journey-header" onclick="toggleSection('invite')">
+          <div class="journey-step-num">2</div>
+          <div class="journey-step-info">
+            <div class="journey-step-title">Claim your invite</div>
+            <div class="journey-step-hint">Already have a code? Activate it here</div>
+          </div>
+          <div class="journey-chevron" id="chevron-invite">\\u25B6</div>
+        </div>
+        <div class="journey-body collapsed" id="body-invite">
+          <div class="journey-input-row">
+            <input type="text" id="inviteCode" class="journey-input" placeholder="abc123-def456-ghi789" spellcheck="false" />
+            <button class="btn btn-primary" id="inviteBtn" onclick="submitInvite()">Claim</button>
+          </div>
+          <div id="inviteStatus"></div>
+        </div>
+      </div>
+
+      <!-- Section 3: Sign In -->
+      <div class="journey-section" id="sect-signin">
+        <div class="journey-header" onclick="toggleSection('signin')">
+          <div class="journey-step-num">3</div>
+          <div class="journey-step-info">
+            <div class="journey-step-title">Sign in</div>
+            <div class="journey-step-hint">Already invited? Authenticate to continue</div>
+          </div>
+          <div class="journey-chevron" id="chevron-signin">\\u25B6</div>
+        </div>
+        <div class="journey-body collapsed" id="body-signin">
+          <div class="provider-cards" style="margin:12px 0 16px;">
+            <div class="provider-card glow-card" onclick="doLogin('google')">
+              <div class="icon">\${GOOGLE_SVG}</div>
+              <div class="name">Google</div>
+              <div class="hint">Sign in with Google</div>
+            </div>
+            <div class="provider-card glow-card" onclick="doLogin('github')">
+              <div class="icon">\${GITHUB_SVG}</div>
+              <div class="name">GitHub</div>
+              <div class="hint">Sign in with GitHub</div>
+            </div>
+          </div>
+          <div id="loginStatus"></div>
+        </div>
       </div>
     </div>
-    <div id="loginStatus"></div>
     <div class="btn-row-right">
       <button class="btn btn-ghost" onclick="next()">Skip for now</button>
     </div>
   \`;
+
+  // Auto-open waitlist section
+  document.getElementById('waitlistEmail')?.focus();
+}
+
+let openSection = 'waitlist';
+
+function toggleSection(id) {
+  const sections = ['waitlist', 'invite', 'signin'];
+  sections.forEach(s => {
+    const body = document.getElementById('body-' + s);
+    const chev = document.getElementById('chevron-' + s);
+    if (s === id && body.classList.contains('collapsed')) {
+      body.classList.remove('collapsed');
+      if (chev) chev.textContent = '\\u25BC';
+      openSection = id;
+    } else if (s !== id) {
+      body.classList.add('collapsed');
+      if (chev) chev.textContent = '\\u25B6';
+    }
+  });
+}
+
+function validateEmail(email) {
+  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+}
+
+function submitWaitlist() {
+  const input = document.getElementById('waitlistEmail');
+  const btn = document.getElementById('waitlistBtn');
+  const status = document.getElementById('waitlistStatus');
+  const email = input.value.trim();
+
+  if (!validateEmail(email)) {
+    status.innerHTML = '<div class="journey-error">Please enter a valid email address</div>';
+    input.classList.add('input-error');
+    return;
+  }
+
+  input.classList.remove('input-error');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.textContent = 'Sending...';
+  status.innerHTML = '';
+
+  vscode.postMessage({ type: 'waitlist', email });
+}
+
+function submitInvite() {
+  const input = document.getElementById('inviteCode');
+  const btn = document.getElementById('inviteBtn');
+  const status = document.getElementById('inviteStatus');
+  const code = input.value.trim();
+
+  if (!code || code.length < 4) {
+    status.innerHTML = '<div class="journey-error">Please enter a valid invite code</div>';
+    input.classList.add('input-error');
+    return;
+  }
+
+  input.classList.remove('input-error');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.textContent = 'Verifying...';
+  status.innerHTML = '';
+
+  vscode.postMessage({ type: 'join-invite', code });
+}
+
+function handleWaitlistStatus(msg) {
+  const btn = document.getElementById('waitlistBtn');
+  const status = document.getElementById('waitlistStatus');
+  if (!btn || !status) return;
+
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.textContent = 'Request Access';
+
+  if (msg.success) {
+    status.innerHTML = '<div class="journey-success">\\u2713 Request sent! Check your inbox (and spam folder) in the next 7 days.</div>';
+    btn.textContent = 'Sent';
+    btn.disabled = true;
+    // Auto-open invite section after success
+    setTimeout(() => toggleSection('invite'), 1500);
+  } else {
+    status.innerHTML = '<div class="journey-error">' + escapeHtml(msg.message) + '</div>';
+  }
+}
+
+function handleJoinStatus(msg) {
+  const btn = document.getElementById('inviteBtn');
+  const status = document.getElementById('inviteStatus');
+  if (!btn || !status) return;
+
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.textContent = 'Claim';
+
+  if (msg.success) {
+    status.innerHTML = '<div class="journey-success">\\u2713 Invite claimed!' + (msg.email ? ' Welcome, ' + escapeHtml(msg.email) + '.' : '') + ' Now sign in below.</div>';
+    btn.textContent = 'Claimed';
+    btn.disabled = true;
+    // Auto-open sign-in section
+    setTimeout(() => toggleSection('signin'), 1200);
+  } else {
+    status.innerHTML = '<div class="journey-error">' + escapeHtml(msg.message) + '</div>';
+  }
 }
 
 function doLogin(provider) {

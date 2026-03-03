@@ -507,6 +507,31 @@ export class DexClient {
     });
   }
 
+  /** Submit waitlist request with email */
+  async waitlist(email: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const text = await this.execText(["waitlist", email]);
+      const ok = text.toLowerCase().includes("sent") || text.toLowerCase().includes("success");
+      return { success: ok, message: ok ? "Waitlist request sent" : text.trim() };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, message: msg };
+    }
+  }
+
+  /** Claim an invite code */
+  async joinInvite(code: string): Promise<{ success: boolean; email: string; message: string }> {
+    try {
+      const text = await this.execText(["join", code]);
+      const ok = text.toLowerCase().includes("valid") || text.toLowerCase().includes("welcome");
+      const emailMatch = text.match(/Invited email:\s*(\S+)/i) || text.match(/email[:\s]+(\S+@\S+)/i);
+      return { success: ok, email: emailMatch?.[1] || "", message: ok ? "Invite claimed" : text.trim() };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, email: "", message: msg };
+    }
+  }
+
   /** Check registry authentication status */
   async registryWhoami(): Promise<RegistryWhoami> {
     try {
