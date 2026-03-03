@@ -21,6 +21,8 @@ import {
 } from "./panels/registryPanel";
 import { ExploreTreeProvider } from "./views/exploreTree";
 import { VaultTreeProvider } from "./views/vaultTree";
+import { CatalogViewProvider } from "./views/catalogView";
+import { showCatalogDetailPanel } from "./panels/catalogDetailPanel";
 import { InfoTreeProvider } from "./views/infoTree";
 import { SetupTreeProvider } from "./views/setupTree";
 import { showExploreResultsPanel } from "./panels/explorePanel";
@@ -64,11 +66,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const exploreTree = new ExploreTreeProvider(client);
   exploreTree.setExtensionUri(context.extensionUri);
   const vaultTree = new VaultTreeProvider(client);
+  const catalogView = new CatalogViewProvider(client, context.extensionUri);
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("modiqo-setup", setupTree),
     vscode.window.registerTreeDataProvider("modiqo-info", infoTree),
     vscode.window.registerTreeDataProvider("modiqo-adapters", adapterTree),
+    vscode.window.registerWebviewViewProvider("modiqo-catalog", catalogView),
     vscode.window.registerTreeDataProvider("modiqo-flows", flowTree),
     vscode.window.registerTreeDataProvider("modiqo-workspaces", workspaceTree),
     vscode.window.registerTreeDataProvider("modiqo-registry", registryTree),
@@ -321,6 +325,15 @@ export function activate(context: vscode.ExtensionContext): void {
       if (exploreTree.cachedResult) {
         showExploreResultsPanel(context.extensionUri, exploreTree.cachedResult);
       }
+    }),
+    vscode.commands.registerCommand("modiqo.refreshCatalog", () => {
+      catalogView.refresh();
+    }),
+    vscode.commands.registerCommand("modiqo.catalogDetail", async (adapterId: string) => {
+      await showCatalogDetailPanel(context.extensionUri, client, adapterId, () => {
+        adapterTree.refresh();
+        statusBar.refresh();
+      });
     }),
     registerConfigureToken(client),
     registerVerifyAdapter(client),
