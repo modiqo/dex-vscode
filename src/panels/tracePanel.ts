@@ -52,6 +52,7 @@ export function showTracePanel(
 
   const state = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
   const bars = buildTraceData(ws, state);
+  const isFlow = (state.named_vars?.execution_mode || "interactive") === "flow";
 
   if (bars.length === 0) {
     vscode.window.showInformationMessage("No trace data available.");
@@ -91,7 +92,8 @@ export function showTracePanel(
     totalTokensOut,
     successCount,
     throughput,
-    d3Uri.toString()
+    d3Uri.toString(),
+    isFlow
   );
 }
 
@@ -223,21 +225,54 @@ function buildPulseSvg(bars: TraceBar[], totalMs: number, _totalTokens: number):
 
   // Build polyline points: flat baseline with spikes at each query
   const points: string[] = [`0,${height}`];
+  // Track hit regions for each bar
+  const hitRegions: { x: number; xEnd: number; spikeH: number; bar: TraceBar; idx: number }[] = [];
 
-  for (const bar of bars) {
+  for (let i = 0; i < bars.length; i++) {
+    const bar = bars[i];
     const x = totalMs > 0 ? (bar.start_offset_ms / totalMs) * width : 0;
     const spikeH = Math.max((bar.tokens_total / maxTk) * (height - 10), 4);
     const xEnd = totalMs > 0 ? ((bar.start_offset_ms + bar.duration_ms) / totalMs) * width : x + 10;
 
-    // Approach baseline, spike up, come back
+    hitRegions.push({ x, xEnd, spikeH, bar, idx: i });
+
+    // Approach baseline, rise to plateau, descend back
     points.push(`${Math.max(x - 4, 0)},${height}`);
     points.push(`${x},${height - spikeH}`);
-    points.push(`${(x + xEnd) / 2},${height - spikeH * 0.3}`);
-    points.push(`${xEnd},${height - spikeH * 0.7}`);
+    points.push(`${xEnd},${height - spikeH * 0.85}`);
     points.push(`${Math.min(xEnd + 4, width)},${height}`);
   }
 
   points.push(`${width},${height}`);
+
+  // Build non-overlapping hover columns: each bar owns from midpoint-to-prev to midpoint-to-next
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // Sort by x position for column partitioning
+  const sorted = [...hitRegions].sort((a, b) => a.x - b.x);
+  // Compute midpoints between adjacent spikes for non-overlapping columns
+  const centers = sorted.map(h => (h.x + h.xEnd) / 2);
+  let hitRects = "";
+  for (let si = 0; si < sorted.length; si++) {
+    const h = sorted[si];
+    const colLeft = si === 0 ? 0 : (centers[si - 1] + centers[si]) / 2;
+    const colRight = si === sorted.length - 1 ? width : (centers[si] + centers[si + 1]) / 2;
+    const rx = Math.max(colLeft, 0);
+    const rw = Math.max(colRight - rx, 4);
+    const b = h.bar;
+    const dur = b.duration_ms < 1000 ? `${Math.round(b.duration_ms)}ms` : `${(b.duration_ms / 1000).toFixed(1)}s`;
+    const time = b.start_offset_ms < 1000 ? `${Math.round(b.start_offset_ms)}ms` : `${(b.start_offset_ms / 1000).toFixed(1)}s`;
+    const label = b.tool_name || b.endpoint || b.method;
+    hitRects += `<rect x="${rx}" y="0" width="${rw}" height="${height}"
+      fill="transparent" cursor="pointer" class="pulse-hit"
+      data-idx="${h.idx}"
+      data-label="${esc(label)}"
+      data-tokens="${b.tokens_total}"
+      data-tokens-in="${b.tokens_in}"
+      data-tokens-out="${b.tokens_out}"
+      data-dur="${dur}"
+      data-time="${time}"
+      data-err="${b.has_error}"/>`;
+  }
 
   return `<svg viewBox="0 0 ${width} ${height + 8}" class="pulse-svg" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -249,6 +284,7 @@ function buildPulseSvg(bars: TraceBar[], totalMs: number, _totalTokens: number):
     <line x1="0" y1="${height}" x2="${width}" y2="${height}" style="stroke: var(--border); stroke-width: 1; stroke-dasharray: 4 4; stroke-opacity: 0.4"/>
     <polygon points="${points.join(" ")}" style="fill: url(#pulse-fill)"/>
     <polyline points="${points.join(" ")}" class="pulse-line" style="fill: none; stroke: var(--success); stroke-width: 1.5; stroke-linecap: round"/>
+    ${hitRects}
   </svg>`;
 }
 
@@ -261,9 +297,15 @@ function buildTraceHtml(
   totalTokensOut: number,
   successCount: number,
   throughput: number,
-  d3ScriptUri: string
+  d3ScriptUri: string,
+  isFlow = false
 ): string {
   const dataJson = JSON.stringify(bars);
+  // Flow mode labels — no LLM reasoning, just API payload
+  const tokenLabel = isFlow ? "payload" : "tokens";
+  const pulseLabel = isFlow ? "API Payload" : "Token Consumption";
+  const throughputUnit = isFlow ? "bytes/sec" : "tokens/sec";
+  const cumulativeLabel = isFlow ? "Cumulative Payload" : "Cumulative Tokens";
   const errorCount = bars.length - successCount;
   const barWidth = 28;
 
@@ -313,6 +355,27 @@ function buildTraceHtml(
     --waterfall-start: rgba(22,130,93,0.05);
     --waterfall-end: rgba(22,130,93,0.3);
     --waterfall-stroke: #16825d;
+  }
+
+  /* Flow mode: blue tones for wire payload (not inference) */
+  body.flow-mode.vscode-dark, body.flow-mode.vscode-high-contrast {
+    --success: #5b9bd5;
+    --success-dark: #3a6fa0;
+    --grad-success-start: #3a6fa0;
+    --grad-success-end: #5b9bd5;
+    --waterfall-start: rgba(91,155,213,0.05);
+    --waterfall-end: rgba(91,155,213,0.35);
+    --waterfall-stroke: #5b9bd5;
+  }
+
+  body.flow-mode.vscode-light {
+    --success: #2a6db5;
+    --success-dark: #1a4d80;
+    --grad-success-start: #1a4d80;
+    --grad-success-end: #2a6db5;
+    --waterfall-start: rgba(42,109,181,0.05);
+    --waterfall-end: rgba(42,109,181,0.3);
+    --waterfall-stroke: #2a6db5;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -520,14 +583,37 @@ function buildTraceHtml(
   .tooltip .tt-divider { border-top: 1px solid var(--border); margin: 6px 0; }
   .tooltip .tt-batch { font-size: 0.8em; color: var(--fg-dim); margin-top: 6px; }
 
+  .flow-banner {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    font-size: 0.85em;
+    color: var(--fg);
+    line-height: 1.6;
+  }
+  .flow-banner strong { color: var(--accent); }
+  .mode-badge {
+    display: inline-block; font-size: 0.7em; padding: 2px 8px;
+    border-radius: 4px; margin-left: 8px; vertical-align: middle;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent); font-weight: 500; letter-spacing: 0.04em;
+  }
+
   footer { margin-top: 24px; font-size: 0.72em; color: var(--fg-dim); }
 </style>
 </head>
-<body>
+<body class="${isFlow ? "flow-mode" : ""}">
   <div class="header">
-    <h1>${escapeHtml(wsName)}</h1>
-    <div class="subtitle">${bars.length} responses &middot; ${fmtMs(totalMs)} total</div>
+    <h1>${escapeHtml(wsName)}${isFlow ? '<span class="mode-badge">flow</span>' : ""}</h1>
+    <div class="subtitle">${bars.length} responses &middot; ${fmtMs(totalMs)} total${isFlow ? " &middot; deterministic execution" : ""}</div>
   </div>
+
+  ${isFlow ? `<div class="flow-banner">
+    <strong>Flow execution</strong> &mdash; no LLM reasoning involved. All API calls were executed deterministically by a pre-built flow.
+    Token counts below represent <strong>wire payload size</strong>, not inference tokens. Cost: network I/O only.
+  </div>` : ""}
 
   <!-- Terminal Ticker -->
   <div class="ticker">
@@ -543,7 +629,7 @@ function buildTraceHtml(
       <span class="tk-dim">${successCount} ok${errorCount > 0 ? ` &middot; <span style="color:var(--error)">${errorCount} err</span>` : ""}</span>
     </div>
     <div class="ticker-line">
-      <span class="tk-label">tokens</span>
+      <span class="tk-label">${tokenLabel}</span>
       ${tickerBar(totalTokensIn, totalTokens, barWidth)}
       <span class="tk-val">${totalTokens.toLocaleString()}</span>
       <span class="tk-dim">${fmtTokensShort(totalTokensIn)} in &middot; ${fmtTokensShort(totalTokensOut)} out</span>
@@ -552,18 +638,18 @@ function buildTraceHtml(
       <span class="tk-label">throughput</span>
       ${tickerBar(throughput, throughput, barWidth)}
       <span class="tk-val">${throughput.toLocaleString()}</span>
-      <span class="tk-dim">tokens/sec</span>
+      <span class="tk-dim">${throughputUnit}</span>
     </div>
     <div class="duration-breakdown" id="dur-breakdown"></div>
   </div>
 
   <!-- Pulse Meter -->
   <div class="pulse-section">
-    <div class="section-label">Token Consumption</div>
+    <div class="section-label">${pulseLabel}</div>
     ${buildPulseSvg(bars, totalMs, totalTokens)}
     <div class="pulse-legend">
       <span>0</span>
-      <span>${totalTokens.toLocaleString()} tokens</span>
+      <span>${totalTokens.toLocaleString()} ${tokenLabel}</span>
     </div>
   </div>
 
@@ -572,11 +658,11 @@ function buildTraceHtml(
   <div class="detail-cards-container" id="detail-cards"></div>
 
   <div class="waterfall-section">
-    <div class="waterfall-title">Cumulative Tokens</div>
+    <div class="waterfall-title">${cumulativeLabel}</div>
     <div id="waterfall-container"></div>
     <div class="waterfall-label">
       <span>0</span>
-      <span>${totalTokens.toLocaleString()} tokens</span>
+      <span>${totalTokens.toLocaleString()} ${tokenLabel}</span>
     </div>
   </div>
 
@@ -588,6 +674,8 @@ function buildTraceHtml(
     const data = ${dataJson};
     const totalMs = ${totalMs};
     const totalTokens = ${totalTokens};
+    const isFlow = ${isFlow};
+    const tokenLabel = isFlow ? 'payload' : 'tokens';
 
     // Read CSS custom properties for D3
     const cs = getComputedStyle(document.body);
@@ -771,12 +859,21 @@ function buildTraceHtml(
             })
             .on('mousemove', (e) => {
               tooltip.style.display = 'block';
-              tooltip.style.left = Math.min(e.clientX + 14, window.innerWidth - 420) + 'px';
-              tooltip.style.top = (e.clientY - 10) + 'px';
+              const ttW = tooltip.offsetWidth || 260;
+              const ttH = tooltip.offsetHeight || 160;
+              let ttLeft = e.clientX + 14;
+              let ttTop = e.clientY - 10;
+              if (ttLeft + ttW > window.innerWidth - 8) { ttLeft = e.clientX - ttW - 14; }
+              if (ttTop + ttH > window.innerHeight - 8) { ttTop = e.clientY - ttH - 14; }
+              if (ttLeft < 4) { ttLeft = 4; }
+              if (ttTop < 4) { ttTop = 4; }
+              tooltip.style.left = ttLeft + 'px';
+              tooltip.style.top = ttTop + 'px';
+              const pLabel = isFlow ? 'payload' : 'Tokens';
               let html = '<div class="tt-title">@' + bar.response_id + ' ' + escapeHtml(bar.method) + '</div>';
               html += '<div class="tt-row">Duration <span>' + fmtMs(bar.duration_ms) + '</span></div>';
-              html += '<div class="tt-row">Tokens in <span>' + bar.tokens_in.toLocaleString() + '</span></div>';
-              html += '<div class="tt-row">Tokens out <span>' + bar.tokens_out.toLocaleString() + '</span></div>';
+              html += '<div class="tt-row">' + pLabel + ' in <span>' + bar.tokens_in.toLocaleString() + '</span></div>';
+              html += '<div class="tt-row">' + pLabel + ' out <span>' + bar.tokens_out.toLocaleString() + '</span></div>';
               html += '<div class="tt-row">Total <span>' + bar.tokens_total.toLocaleString() + '</span></div>';
               html += '<div class="tt-row">Offset <span>' + fmtMs(bar.start_offset_ms) + '</span></div>';
               if (bar.tool_calls.length > 0) {
@@ -1014,6 +1111,49 @@ function buildTraceHtml(
     render();
     const ro = new ResizeObserver(() => render());
     ro.observe(chartContainer);
+
+    // Pulse chart hover tooltips
+    document.querySelectorAll('.pulse-hit').forEach(rect => {
+      rect.addEventListener('mouseenter', (e) => {
+        const r = e.target;
+        const label = r.getAttribute('data-label');
+        const tokens = parseInt(r.getAttribute('data-tokens'));
+        const tokIn = parseInt(r.getAttribute('data-tokens-in'));
+        const tokOut = parseInt(r.getAttribute('data-tokens-out'));
+        const dur = r.getAttribute('data-dur');
+        const time = r.getAttribute('data-time');
+        const isErr = r.getAttribute('data-err') === 'true';
+
+        let html = '<div class="tt-title">' + (isErr ? '<span style="color:var(--error)">&#9679;</span> ' : '<span style="color:var(--success)">&#9679;</span> ') + escapeHtml(label) + '</div>';
+        html += '<div class="tt-row">time <span>' + time + '</span></div>';
+        html += '<div class="tt-row">duration <span>' + dur + '</span></div>';
+        html += '<div class="tt-divider"></div>';
+        html += '<div class="tt-row">' + tokenLabel + ' <span>' + tokens.toLocaleString() + '</span></div>';
+        html += '<div class="tt-row">in <span>' + tokIn.toLocaleString() + '</span></div>';
+        html += '<div class="tt-row">out <span>' + tokOut.toLocaleString() + '</span></div>';
+
+        tooltip.innerHTML = html;
+        tooltip.style.display = 'block';
+      });
+
+      rect.addEventListener('mousemove', (e) => {
+        const pad = 12;
+        const tw = tooltip.offsetWidth || 260;
+        const th = tooltip.offsetHeight || 160;
+        let left = e.clientX + pad;
+        let top = e.clientY - 10;
+        if (left + tw > window.innerWidth - 8) { left = e.clientX - tw - pad; }
+        if (top + th > window.innerHeight - 8) { top = e.clientY - th - pad; }
+        if (left < 4) { left = 4; }
+        if (top < 4) { top = 4; }
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+      });
+
+      rect.addEventListener('mouseleave', () => {
+        tooltip.style.display = 'none';
+      });
+    });
   </script>
 </body>
 </html>`;

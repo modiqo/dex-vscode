@@ -37,6 +37,12 @@
           "type": "tree"
         },
         {
+          "id": "modiqo-catalog",
+          "name": "API Catalog",
+          "type": "webview",
+          "when": "modiqo.setupStep >= 2"
+        },
+        {
           "id": "modiqo-info",
           "name": "Info",
           "type": "tree",
@@ -49,12 +55,6 @@
           "when": "modiqo.setupStep >= 2"
         },
         {
-          "id": "modiqo-catalog",
-          "name": "API Catalog",
-          "type": "webview",
-          "when": "modiqo.setupStep >= 2"
-        },
-        {
           "id": "modiqo-flows",
           "name": "Flows",
           "type": "tree",
@@ -64,7 +64,7 @@
           "id": "modiqo-workspaces",
           "name": "Workspaces",
           "type": "tree",
-          "when": "modiqo.setupStep >= 6"
+          "when": "modiqo.setupStep >= 5"
         },
         {
           "id": "modiqo-registry",
@@ -81,7 +81,7 @@
         {
           "id": "modiqo-explore",
           "name": "Explore",
-          "type": "tree",
+          "type": "webview",
           "when": "modiqo.setupStep >= 2"
         }
       ]

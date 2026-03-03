@@ -264,6 +264,21 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
     --context-row-border: rgba(0,0,0,0.08);
   }
 
+  /* Flow mode: blue tones for wire payload (not inference) */
+  body.flow-mode.vscode-dark, body.flow-mode.vscode-high-contrast {
+    --success: #5b9bd5;
+    --success-soft: rgba(91,155,213,0.5);
+    --waffle-ext: rgba(91,155,213,0.55);
+    --rune-inner-stroke: #5b9bd5;
+  }
+
+  body.flow-mode.vscode-light {
+    --success: #2a6db5;
+    --success-soft: rgba(42,109,181,0.35);
+    --waffle-ext: rgba(42,109,181,0.45);
+    --rune-inner-stroke: #2a6db5;
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -290,6 +305,17 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
     background: color-mix(in srgb, var(--accent) 15%, transparent);
     color: var(--accent); font-weight: 500; letter-spacing: 0.04em;
   }
+  .flow-banner {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    font-size: 0.85em;
+    color: var(--fg);
+    line-height: 1.6;
+  }
+  .flow-banner strong { color: var(--accent); }
 
   /* ── Terminal Ticker ───────────── */
   .ticker {
@@ -514,7 +540,7 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
   footer { margin-top: 24px; font-size: 0.72em; color: var(--fg-dim); }
 </style>
 </head>
-<body>
+<body class="${isFlow ? "flow-mode" : ""}">
   <div class="header">
     <h1>${escapeHtml(wsName)}</h1>
     <div class="subtitle">
@@ -522,6 +548,10 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
       <span class="mode-badge">${isFlow ? "flow" : "interactive"}</span>
     </div>
   </div>
+
+  ${isFlow ? `<div class="flow-banner">
+    <strong>Flow execution</strong> &mdash; deterministic, no LLM reasoning. Token counts represent <strong>wire payload size</strong> from API responses, not inference tokens. Reduction shows how much data was filtered before returning to the consumer.
+  </div>` : ""}
 
   <!-- Terminal Ticker -->
   <div class="ticker">
@@ -556,7 +586,10 @@ function buildStatsHtml(wsName: string, stats: StatsData): string {
     <div class="section-label">Token Flow</div>
     ${buildRiverSvg(stats.totalSourceTokens, stats.totalResultTokens, stats.reductionPct)}
     <div class="river-caption">
-      The API sent back <strong>${fmtTokensShort(stats.totalSourceTokens)}</strong> tokens of raw JSON. Through caching and selective extraction (e.g. <code>dex @1 '.data[0].amount'</code>), only <strong>${fmtTokensShort(stats.totalResultTokens)}</strong> reached the agent\u2019s context.${stats.reductionPct > 0 ? ` That\u2019s a <strong>${stats.reductionPct}% reduction</strong> \u2014 ${stats.reduction.toLocaleString()} tokens your agent never had to process.` : ""}
+      ${isFlow
+        ? `The API returned <strong>${fmtTokensShort(stats.totalSourceTokens)}</strong> tokens of raw payload. Through selective extraction (e.g. <code>dex @1 '.data[0].amount'</code>), only <strong>${fmtTokensShort(stats.totalResultTokens)}</strong> was returned to the consumer.${stats.reductionPct > 0 ? ` That\u2019s a <strong>${stats.reductionPct}% reduction</strong> \u2014 ${stats.reduction.toLocaleString()} tokens filtered out before delivery.` : ""} No LLM processing was involved.`
+        : `The API sent back <strong>${fmtTokensShort(stats.totalSourceTokens)}</strong> tokens of raw JSON. Through caching and selective extraction (e.g. <code>dex @1 '.data[0].amount'</code>), only <strong>${fmtTokensShort(stats.totalResultTokens)}</strong> reached the agent\u2019s context.${stats.reductionPct > 0 ? ` That\u2019s a <strong>${stats.reductionPct}% reduction</strong> \u2014 ${stats.reduction.toLocaleString()} tokens your agent never had to process.` : ""}`
+      }
     </div>
   </div>
 

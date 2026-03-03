@@ -82,12 +82,20 @@ export class ExploreTreeItem extends vscode.TreeItem {
           ].join("\n"));
           this.iconPath = new vscode.ThemeIcon("symbol-method");
           this.contextValue = "explore-skill";
+          this.command = {
+            command: "modiqo-flows.focus",
+            title: "Show in Flows",
+          };
         }
         break;
 
       case "adapter-group":
         this.iconPath = new vscode.ThemeIcon("package");
         this.contextValue = "explore-adapter";
+        this.command = {
+          command: "modiqo-adapters.focus",
+          title: "Show in Adapters",
+        };
         break;
 
       case "tool-match":
@@ -134,6 +142,10 @@ export class ExploreTreeItem extends vscode.TreeItem {
               }
             : new vscode.ThemeIcon("zap");
           this.contextValue = "explore-flow-search";
+          this.command = {
+            command: "modiqo-flows.focus",
+            title: "Show in Flows",
+          };
         }
         break;
 

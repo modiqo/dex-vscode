@@ -19,7 +19,7 @@ import {
   showRegistryDetailPanel,
   showRegistryOverviewPanel,
 } from "./panels/registryPanel";
-import { ExploreTreeProvider } from "./views/exploreTree";
+import { ExploreViewProvider } from "./views/exploreView";
 import { VaultTreeProvider } from "./views/vaultTree";
 import { CatalogViewProvider } from "./views/catalogView";
 import { showCatalogDetailPanel } from "./panels/catalogDetailPanel";
@@ -63,8 +63,7 @@ export function activate(context: vscode.ExtensionContext): void {
   workspaceTree.setExtensionUri(context.extensionUri);
   const registryTree = new RegistryTreeProvider(client);
   registryTree.setExtensionUri(context.extensionUri);
-  const exploreTree = new ExploreTreeProvider(client);
-  exploreTree.setExtensionUri(context.extensionUri);
+  const exploreView = new ExploreViewProvider(client, context.extensionUri);
   const vaultTree = new VaultTreeProvider(client);
   const catalogView = new CatalogViewProvider(client, context.extensionUri);
 
@@ -77,7 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerTreeDataProvider("modiqo-workspaces", workspaceTree),
     vscode.window.registerTreeDataProvider("modiqo-registry", registryTree),
     vscode.window.registerTreeDataProvider("modiqo-vault", vaultTree),
-    vscode.window.registerTreeDataProvider("modiqo-explore", exploreTree)
+    vscode.window.registerWebviewViewProvider("modiqo-explore", exploreView)
   );
 
   // Check initial dex state
@@ -183,7 +182,7 @@ export function activate(context: vscode.ExtensionContext): void {
           workspaceTree.refresh();
           registryTree.refresh();
           vaultTree.refresh();
-          exploreTree.refresh();
+          exploreView.refresh();
           statusBar.refresh();
           // Focus the workspaces tree to draw attention away from setup
           vscode.commands.executeCommand("modiqo-workspaces.focus");
@@ -291,7 +290,7 @@ export function activate(context: vscode.ExtensionContext): void {
       });
     }),
     vscode.commands.registerCommand("modiqo.refreshExplore", () => {
-      exploreTree.refresh();
+      exploreView.refresh();
     }),
     vscode.commands.registerCommand("modiqo.exploreSearch", async () => {
       const query = await vscode.window.showInputBox({
@@ -299,10 +298,10 @@ export function activate(context: vscode.ExtensionContext): void {
         placeHolder: "e.g., send an email, list github issues, schedule a meeting",
       });
       if (!query) { return; }
-      exploreTree.search(query);
+      exploreView.search(query);
     }),
     vscode.commands.registerCommand("modiqo.showExploreResults", async () => {
-      if (!exploreTree.cachedResult) {
+      if (!exploreView.cachedResult) {
         // Trigger a search first
         const query = await vscode.window.showInputBox({
           prompt: "Search for adapters and flows by intent",
@@ -317,13 +316,13 @@ export function activate(context: vscode.ExtensionContext): void {
             cancellable: false,
           },
           async () => {
-            await exploreTree.search(query);
+            await exploreView.search(query);
           }
         );
       }
 
-      if (exploreTree.cachedResult) {
-        showExploreResultsPanel(context.extensionUri, exploreTree.cachedResult);
+      if (exploreView.cachedResult) {
+        showExploreResultsPanel(context.extensionUri, exploreView.cachedResult);
       }
     }),
     vscode.commands.registerCommand("modiqo.refreshCatalog", () => {

@@ -45,6 +45,7 @@ export function showPlanPanel(
 
   const state = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
   const plan = buildPlanData(ws.dir, state);
+  const isFlow = (state.named_vars?.execution_mode || "interactive") === "flow";
 
   if (plan.nodes.length === 0) {
     vscode.window.showInformationMessage("No execution data available for plan.");
@@ -58,7 +59,7 @@ export function showPlanPanel(
     { enableScripts: true }
   );
 
-  panel.webview.html = buildPlanHtml(ws.name, plan);
+  panel.webview.html = buildPlanHtml(ws.name, plan, isFlow);
 }
 
 function buildPlanData(
@@ -450,7 +451,7 @@ function buildDagSvg(plan: PlanData): string {
   return svg;
 }
 
-function buildPlanHtml(wsName: string, plan: PlanData): string {
+function buildPlanHtml(wsName: string, plan: PlanData, isFlow = false): string {
   const savingsPct = plan.totalSequentialMs > 0
     ? Math.round(((plan.totalSequentialMs - plan.totalParallelMs) / plan.totalSequentialMs) * 100)
     : 0;
@@ -546,6 +547,19 @@ function buildPlanHtml(wsName: string, plan: PlanData): string {
     --orbital-outer: #999;
     --orbital-middle: var(--accent);
     --orbital-inner: #16825d;
+  }
+
+  /* Flow mode: blue tones for wire payload (not inference) */
+  body.flow-mode.vscode-dark, body.flow-mode.vscode-high-contrast {
+    --success: #5b9bd5;
+    --node-independent-bg: #2a5a8a;
+    --orbital-inner: #5b9bd5;
+  }
+
+  body.flow-mode.vscode-light {
+    --success: #2a6db5;
+    --node-independent-bg: #2a6db5;
+    --orbital-inner: #2a6db5;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -731,14 +745,37 @@ function buildPlanHtml(wsName: string, plan: PlanData): string {
   .warning-label { color: var(--orange); font-weight: 500; }
   .warning-detail { color: var(--fg-dim); margin-top: 4px; }
 
+  .flow-banner {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    font-size: 0.85em;
+    color: var(--fg);
+    line-height: 1.6;
+  }
+  .flow-banner strong { color: var(--accent); }
+  .mode-badge {
+    display: inline-block; font-size: 0.7em; padding: 2px 8px;
+    border-radius: 4px; margin-left: 8px; vertical-align: middle;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent); font-weight: 500; letter-spacing: 0.04em;
+  }
+
   footer { margin-top: 24px; font-size: 0.72em; color: var(--fg-dim); }
 </style>
 </head>
-<body>
+<body class="${isFlow ? "flow-mode" : ""}">
   <div class="header">
-    <h1>${esc(wsName)}</h1>
-    <div class="subtitle">${plan.levels.length} execution levels &middot; ${plan.nodes.length} responses</div>
+    <h1>${esc(wsName)}${isFlow ? '<span class="mode-badge">flow</span>' : ""}</h1>
+    <div class="subtitle">${plan.levels.length} execution levels &middot; ${plan.nodes.length} responses${isFlow ? " &middot; deterministic execution" : ""}</div>
   </div>
+
+  ${isFlow ? `<div class="flow-banner">
+    <strong>Flow execution</strong> &mdash; all API calls follow a pre-built execution plan with no LLM reasoning. The DAG below shows the dependency graph and parallelization potential of this flow.
+    Speedup values represent <strong>network-level parallelization</strong>, not inference savings.
+  </div>` : ""}
 
   <!-- Ticker + Orbital Ring -->
   <div class="top-row">

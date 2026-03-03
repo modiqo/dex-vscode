@@ -699,15 +699,22 @@ export class DexClient {
   // ── Setup wizard methods ────────────────────────────────────────
 
   /** Install an adapter from registry (streaming output).
-   *  Uses `dex registry adapter pull bootstrap/<id>` and auto-confirms. */
+   *  Uses `dex registry adapter pull bootstrap/<id>` and auto-confirms.
+   *  Responds "y\n" to every [Y/n] prompt on stdout instead of writing
+   *  once upfront, so both the install and overwrite prompts are answered. */
   installAdapterStream(adapterId: string): ChildProcess {
     const child = spawn(this.dexPath, ["registry", "adapter", "pull", `bootstrap/${adapterId}`], {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
     });
-    // Auto-confirm the [Y/n] prompt
-    child.stdin?.write("y\n");
-    child.stdin?.end();
+    // Auto-confirm every [Y/n] or [y/N] prompt as stdout arrives
+    child.stdout?.on("data", (data: Buffer) => {
+      const text = data.toString();
+      if (/\[Y\/n\]|\[y\/N\]/i.test(text)) {
+        child.stdin?.write("y\n");
+      }
+    });
+    child.on("close", () => { child.stdin?.end(); });
     return child;
   }
 
@@ -744,8 +751,12 @@ export class DexClient {
           stdio: ["pipe", "pipe", "pipe"],
           env: { ...process.env },
         });
-        child.stdin?.write("y\n");
-        child.stdin?.end();
+        child.stdout?.on("data", (data: Buffer) => {
+          if (/\[Y\/n\]|\[y\/N\]/i.test(data.toString())) {
+            child.stdin?.write("y\n");
+          }
+        });
+        child.on("close", () => { child.stdin?.end(); });
         const code = await new Promise<number | null>((resolve) => {
           child.on("close", resolve);
           child.on("error", () => resolve(1));
