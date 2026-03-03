@@ -137,6 +137,13 @@ export function showSetupWizardPanel(
         }
         break;
       }
+      case "open-sidebar-view": {
+        vscode.commands.executeCommand(`${msg.view}.focus`).then(
+          () => {},
+          () => {},
+        );
+        break;
+      }
       case "complete-setup": {
         // Ensure stdio baseline + daemon before completing
         await client.ensureStdioBaseline();
@@ -623,7 +630,7 @@ body.dimmed .wizard { opacity: 0.35; pointer-events: none; }
 
 /* ── Step container ──────────────────────── */
 
-.step-container { min-height: 200px; }
+.step-container { min-height: 200px; padding-bottom: 24px; }
 .step-container.entering { animation: step-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .step-container.exiting  { animation: step-exit 0.18s ease-in forwards; }
 
@@ -1143,6 +1150,168 @@ body.vscode-light .install-bar { background: rgba(255, 255, 255, 0.92); backdrop
   padding: 8px 12px;
   background: color-mix(in srgb, var(--error) 8%, transparent);
   border-radius: 6px;
+}
+
+/* ── Done page accordions ────────────────── */
+
+.done-accordions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.done-section {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.done-section:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--card-border));
+}
+
+.done-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.done-header:hover { opacity: 0.9; }
+
+.done-header-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 8px;
+}
+
+.done-header-info { flex: 1; }
+
+.done-header-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.done-header-hint {
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.done-chevron {
+  font-size: 10px;
+  opacity: 0.4;
+  transition: transform 0.2s;
+}
+
+.done-body {
+  padding: 0 20px 20px;
+  animation: journey-expand 0.2s ease;
+}
+
+.done-body.collapsed {
+  display: none;
+}
+
+.done-aha {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.done-aha p { margin: 0 0 10px; }
+
+.done-aha-lead {
+  font-weight: 600;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.done-aha-kicker {
+  font-size: 13px;
+  opacity: 0.7;
+  font-style: italic;
+  margin-top: 6px;
+}
+
+.done-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px dotted color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: opacity 0.15s;
+}
+
+.done-link:hover { opacity: 0.8; }
+
+.done-cta-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.done-link-btn {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+  transition: opacity 0.15s;
+}
+
+.done-link-btn:hover { opacity: 0.7; text-decoration: underline; }
+
+.done-more-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.done-more-card {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.done-more-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--card-border));
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.done-more-icon {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.done-more-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.done-more-desc {
+  font-size: 11px;
+  opacity: 0.5;
+  line-height: 1.4;
 }
 
 /* ── Adapter selection cards ─────────────── */
@@ -2976,7 +3145,7 @@ function renderTokenStep(vaultTokens) {
         <div class="vault-title">Pull from Vault</div>
         <div class="vault-desc muted">Restore encrypted tokens from the dex registry vault.</div>
       </div>
-      <button class="btn btn-primary" onclick="showPassphraseModal()" id="vaultPullBtn" style="min-width:110px;">Pull Vault &#x1F513;</button>
+      <button class="btn btn-primary" onclick="showPassphraseModal()" id="vaultPullBtn" style="min-width:110px;">Pull Vault</button>
     </div>
     <div id="vaultPullStatus"></div>
   \`;
@@ -3141,7 +3310,7 @@ function handleVaultPullStatus(msg) {
     var expiredTokens = (msg.vaultTokens || []).filter(function(t) { return t.expires_in === 'expired'; });
     if (expiredTokens.length > 0) {
       var warn = document.createElement('div');
-      warn.style.cssText = 'margin-top:10px;padding:10px 14px;background:rgba(244,71,71,0.08);border:1px solid var(--error);border-radius:8px;';
+      warn.style.cssText = 'margin-top:12px;margin-bottom:16px;padding:10px 14px;background:rgba(244,71,71,0.08);border:1px solid var(--error);border-radius:8px;';
       var warnTitle = document.createElement('div');
       warnTitle.style.cssText = 'font-size:12px;font-weight:600;color:var(--error);margin-bottom:6px;';
       warnTitle.textContent = expiredTokens.length + ' token' + (expiredTokens.length > 1 ? 's' : '') + ' may be expired';
@@ -3578,33 +3747,103 @@ function renderComplete(el) {
       </div>
     </div>
 
-    <div class="try-section-label">Try it now</div>
+    <!-- Wait what happened? accordion -->
+    <div class="done-accordions">
 
-    <div class="try-card">
-      <div class="try-icon">\${claudeIcon}</div>
-      <div class="try-body">
-        <div class="try-tool">Claude Code <span class="try-tool-badge">MCP</span></div>
-        <div class="try-prompt"><span class="cmd">/dex</span> <span class="query">fetch my recent emails from the last 10 days</span></div>
-        <div class="try-desc">Invoke dex as a slash command. Claude will use your connected APIs automatically.</div>
+      <div class="done-section" id="done-sect-what">
+        <div class="done-header" onclick="toggleDoneSection('what')">
+          <div class="done-header-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M11 1L4 11h5l-1 8 7-10h-5l1-8z" stroke="var(--accent)" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg></div>
+          <div class="done-header-info">
+            <div class="done-header-title">Wait, what just happened?</div>
+            <div class="done-header-hint">You just ran someone else's productivity memory on your own services</div>
+          </div>
+          <div class="done-chevron" id="done-chev-what">\\u25BC</div>
+        </div>
+        <div class="done-body" id="done-body-what">
+          <div class="done-aha">
+            <p class="done-aha-lead">Yep, you read that right.</p>
+            <p>A shared <a href="#" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-flows'});return false;" class="done-link">memory flow</a> borrowed the right <a href="#" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-adapters'});return false;" class="done-link">API adapter</a>, authenticated with your credentials, and lit up a <a href="#" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-explore'});return false;" class="done-link">workspace</a> \\u2014 all without writing a single line of glue code.</p>
+            <p class="done-aha-kicker">That's the trick: <em>context is the new code.</em></p>
+            <div class="done-cta-row">
+              <span>Want to build your own?</span>
+              <a href="#" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-catalog'});return false;" class="done-link-btn">Browse the API Catalog \\u2192</a>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="try-card">
-      <div class="try-icon">\${codexIcon}</div>
-      <div class="try-body">
-        <div class="try-tool">Codex <span class="try-tool-badge">CLI</span></div>
-        <div class="try-prompt"><span class="cmd">$dex</span> <span class="query">fetch my rideshare receipts for February 2026</span></div>
-        <div class="try-desc">Prefix with $dex in Codex CLI. Dex resolves the right API, auth, and returns structured data.</div>
+      <div class="done-section" id="done-sect-try">
+        <div class="done-header" onclick="toggleDoneSection('try')">
+          <div class="done-header-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17l2-6 4 4-6 2z" stroke="var(--accent)" stroke-width="1.4" fill="none" stroke-linejoin="round"/><path d="M5 11l4-8c2-3 6-2 8 0s3 6 0 8l-8 4" stroke="var(--accent)" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="12" cy="8" r="1.5" stroke="var(--accent)" stroke-width="1.2" fill="none"/></svg></div>
+          <div class="done-header-info">
+            <div class="done-header-title">Try it now</div>
+            <div class="done-header-hint">Use dex through Claude Code, Codex, or any AI tool</div>
+          </div>
+          <div class="done-chevron" id="done-chev-try">\\u25B6</div>
+        </div>
+        <div class="done-body collapsed" id="done-body-try">
+          <div class="try-card" style="margin-top:0;">
+            <div class="try-icon">\${claudeIcon}</div>
+            <div class="try-body">
+              <div class="try-tool">Claude Code <span class="try-tool-badge">MCP</span></div>
+              <div class="try-prompt"><span class="cmd">/dex</span> <span class="query">fetch my recent emails from the last 10 days</span></div>
+              <div class="try-desc">Invoke dex as a slash command. Claude will use your connected APIs automatically.</div>
+            </div>
+          </div>
+          <div class="try-card">
+            <div class="try-icon">\${codexIcon}</div>
+            <div class="try-body">
+              <div class="try-tool">Codex <span class="try-tool-badge">CLI</span></div>
+              <div class="try-prompt"><span class="cmd">$dex</span> <span class="query">fetch my rideshare receipts for February 2026</span></div>
+              <div class="try-desc">Prefix with $dex in Codex CLI. Dex resolves the right API, auth, and returns structured data.</div>
+            </div>
+          </div>
+          <div class="try-card">
+            <div class="try-icon">\${agentsIcon}</div>
+            <div class="try-body">
+              <div class="try-tool">Any AI Tool <span class="try-tool-badge">AGENTS.md</span></div>
+              <div class="try-prompt"><span class="query">learn how to use dex and dex browse to fetch the latest hacker news updates</span></div>
+              <div class="try-desc">Any tool that reads AGENTS.md will discover dex capabilities and invoke them on your behalf.</div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="try-card">
-      <div class="try-icon">\${agentsIcon}</div>
-      <div class="try-body">
-        <div class="try-tool">Any AI Tool <span class="try-tool-badge">AGENTS.md</span></div>
-        <div class="try-prompt"><span class="query">learn how to use dex and dex browse to fetch the latest hacker news updates</span></div>
-        <div class="try-desc">Any tool that reads AGENTS.md will discover dex capabilities and invoke them on your behalf.</div>
+      <div class="done-section" id="done-sect-more">
+        <div class="done-header" onclick="toggleDoneSection('more')">
+          <div class="done-header-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="var(--accent)" stroke-width="1.4"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="var(--accent)" stroke-width="1.4"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="var(--accent)" stroke-width="1.4"/><path d="M14.5 12v5M12 14.5h5" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+          <div class="done-header-info">
+            <div class="done-header-title">Start adapting to more</div>
+            <div class="done-header-hint">635+ APIs are waiting \\u2014 pick your next adapter</div>
+          </div>
+          <div class="done-chevron" id="done-chev-more">\\u25B6</div>
+        </div>
+        <div class="done-body collapsed" id="done-body-more">
+          <div class="done-more-grid">
+            <div class="done-more-card" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-catalog'})">
+              <div class="done-more-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="7.5" cy="7.5" r="5" stroke="var(--fg-dim)" stroke-width="1.3"/><path d="M11.5 11.5l4 4" stroke="var(--fg-dim)" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+              <div class="done-more-label">API Catalog</div>
+              <div class="done-more-desc">Search and install from 635+ adapters</div>
+            </div>
+            <div class="done-more-card" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-adapters'})">
+              <div class="done-more-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="11" rx="1.5" stroke="var(--fg-dim)" stroke-width="1.3"/><path d="M2 7.5h14M6 4V2.5M12 4V2.5" stroke="var(--fg-dim)" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+              <div class="done-more-label">My Adapters</div>
+              <div class="done-more-desc">Manage your installed API adapters</div>
+            </div>
+            <div class="done-more-card" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-flows'})">
+              <div class="done-more-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v4M9 12v4M5 6h8M5 12h8" stroke="var(--fg-dim)" stroke-width="1.3" stroke-linecap="round"/><circle cx="9" cy="6" r="2" stroke="var(--fg-dim)" stroke-width="1.3"/><circle cx="9" cy="12" r="2" stroke="var(--fg-dim)" stroke-width="1.3"/></svg></div>
+              <div class="done-more-label">Flows</div>
+              <div class="done-more-desc">Browse shared and custom memory flows</div>
+            </div>
+            <div class="done-more-card" onclick="vscode.postMessage({type:'open-sidebar-view',view:'modiqo-explore'})">
+              <div class="done-more-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="8" width="3" height="7" rx="0.5" stroke="var(--fg-dim)" stroke-width="1.2"/><rect x="7.5" y="5" width="3" height="10" rx="0.5" stroke="var(--fg-dim)" stroke-width="1.2"/><rect x="13" y="3" width="3" height="12" rx="0.5" stroke="var(--fg-dim)" stroke-width="1.2"/></svg></div>
+              <div class="done-more-label">Workspaces</div>
+              <div class="done-more-desc">See your execution traces and results</div>
+            </div>
+          </div>
+        </div>
       </div>
+
     </div>
 
     <div style="text-align:center; margin-top:28px;">
@@ -3646,6 +3885,21 @@ function renderComplete(el) {
   ttaCard.appendChild(ttaTime);
   ttaCard.appendChild(ttaMsg);
   el.appendChild(ttaCard);
+}
+
+function toggleDoneSection(id) {
+  var sections = ['what', 'try', 'more'];
+  sections.forEach(function(s) {
+    var body = document.getElementById('done-body-' + s);
+    var chev = document.getElementById('done-chev-' + s);
+    if (s === id && body.classList.contains('collapsed')) {
+      body.classList.remove('collapsed');
+      if (chev) chev.textContent = '\\u25BC';
+    } else if (s !== id) {
+      body.classList.add('collapsed');
+      if (chev) chev.textContent = '\\u25B6';
+    }
+  });
 }
 
 function finishSetup() {

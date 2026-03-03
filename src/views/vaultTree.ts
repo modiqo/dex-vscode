@@ -58,7 +58,7 @@ export class VaultTreeProvider implements vscode.TreeDataProvider<VaultItem> {
       if (this.tokens.length === 0) {
         return [
           new VaultItem("empty", "No tokens stored", undefined, {
-            icon: "lock",
+            icon: "key",
             description: "run: dex token set <NAME>",
           }),
         ];
@@ -74,7 +74,7 @@ export class VaultTreeProvider implements vscode.TreeDataProvider<VaultItem> {
       for (const t of this.tokens) {
         const isExpired = t.expires_in === "expired";
         const isOauth = t.type === "oauth2";
-        let icon = "lock";
+        let icon = "key";
         if (isOauth) { icon = "key"; }
         if (isExpired) { icon = "warning"; }
 
