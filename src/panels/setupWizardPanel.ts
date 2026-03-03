@@ -2086,6 +2086,7 @@ let selectedAdapters = new Set();
 let installedAdapters = [];
 let tokenRequirements = [];
 let selectedWireClients = new Set();
+let totalFlowsInstalled = 0;
 let proofResults = {};
 
 const POPULAR = ['github', 'gmail', 'calendar', 'stripe'];
@@ -2579,6 +2580,9 @@ function handleInstallProgress(msg) {
     if (badge) { badge.className = 'pipeline-badge success'; badge.textContent = msg.message; }
     if (status) status.textContent = 'Complete';
     if (logEl) logEl.style.display = 'none';
+    // Track flow count from messages like "Installed (3 flows)"
+    var flowMatch = msg.message && msg.message.match(/\\((\\d+)\\s+flow/);
+    if (flowMatch) totalFlowsInstalled += parseInt(flowMatch[1], 10);
   } else if (msg.status === 'error') {
     item.className = 'pipeline-item error';
     if (node) { node.className = 'pipeline-node error'; node.innerHTML = xSvg; }
@@ -3226,9 +3230,15 @@ function showProofOutput(adapter, btn) {
 // ── Step 6: Complete ───────────────────────
 
 function renderComplete(el) {
+  // Stop the Time to Agent timer — we've arrived
+  if (ttaIntervalId) { clearInterval(ttaIntervalId); ttaIntervalId = null; }
+
   const adapterCount = installedAdapters.length;
-  const tokenCount = tokenRequirements.filter(t => t.configured).length;
-  const wireCount = selectedWireClients.size;
+  const flowCount = totalFlowsInstalled;
+  const wiredNames = [...selectedWireClients]
+    .map(id => WIRE_CLIENTS.find(w => w.id === id))
+    .filter(Boolean)
+    .map(w => w.name);
 
   const claudeIcon = WIRE_CLIENTS.find(w => w.id === 'dex-skill-claude-code')?.icon || '';
   const codexIcon = WIRE_CLIENTS.find(w => w.id === 'dex-skill-codex')?.icon || '';
@@ -3243,15 +3253,14 @@ function renderComplete(el) {
     <div class="summary-row">
       <div class="summary-stat">
         <div class="summary-stat-num">\${adapterCount}</div>
-        <div class="summary-stat-label">APIs</div>
+        <div class="summary-stat-label">Adapter\${adapterCount !== 1 ? 's' : ''}</div>
       </div>
       <div class="summary-stat">
-        <div class="summary-stat-num">\${tokenCount}</div>
-        <div class="summary-stat-label">Tokens</div>
+        <div class="summary-stat-num">\${flowCount}</div>
+        <div class="summary-stat-label">Flow\${flowCount !== 1 ? 's' : ''}</div>
       </div>
-      <div class="summary-stat">
-        <div class="summary-stat-num">\${wireCount}</div>
-        <div class="summary-stat-label">Tools</div>
+      <div class="summary-stat" style="flex:1.5;">
+        <div class="summary-stat-label" style="font-size:0.85em;">Wired for \${wiredNames.join(' & ')}</div>
       </div>
     </div>
 
@@ -3333,6 +3342,7 @@ function finishSetup() {
 
 renderStep();
 
+var ttaIntervalId = null;
 (function() {
   var timerEl = document.getElementById('ttaTimer');
   function updateTimer() {
@@ -3343,7 +3353,7 @@ renderStep();
     timerEl.innerHTML = 'Time to Agent<sup style="font-size:0.6em;vertical-align:super;">\u2122</sup>  ' + timeStr;
   }
   updateTimer();
-  setInterval(updateTimer, 1000);
+  ttaIntervalId = setInterval(updateTimer, 1000);
 })();
 `;
 

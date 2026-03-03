@@ -420,11 +420,23 @@ export class DexClient {
     }
   }
 
-  /** Get vault tokens — parses the table output of `dex token list` */
+  /** Get vault tokens from `dex token list --json` */
   async vaultTokenList(): Promise<VaultToken[]> {
     try {
-      const text = await this.execText(["token", "list"]);
-      return this.parseVaultTokenTable(text);
+      const text = await this.execText(["token", "list", "--json"]);
+      const arr = JSON.parse(text) as Array<{
+        name: string; type: string; created?: string | null;
+        expires_in?: string | null; refresh?: string | null;
+        description?: string | null;
+      }>;
+      return arr.map(t => ({
+        name: t.name,
+        type: t.type || "-",
+        expires_in: t.expires_in || "-",
+        refresh: t.refresh || "-",
+        created: t.created || "-",
+        description: t.description || "-",
+      }));
     } catch {
       return [];
     }
@@ -1252,58 +1264,6 @@ export class DexClient {
     return tokens;
   }
 
-  /** Parse `dex token list` table with │-delimited columns:
-   *  Name | Type | Expires In | Refresh | Created | Description */
-  private parseVaultTokenTable(text: string): VaultToken[] {
-    const tokens: VaultToken[] = [];
-    const lines = text.split("\n");
-
-    for (const line of lines) {
-      // Skip borders (┌─┬─┐, ├─┼─┤, └─┴─┘), headers, status/result sections
-      if (
-        !line.includes("│") ||
-        line.includes("Name") && line.includes("Type") && line.includes("Expires")
-      ) {
-        continue;
-      }
-
-      const cells = line
-        .split("│")
-        .map((c) => c.trim())
-        .filter((c) => c.length > 0);
-
-      if (cells.length < 2) {
-        continue;
-      }
-
-      // A data row has a name in the first cell (non-empty, not a continuation line)
-      const name = cells[0];
-      if (!name || name.startsWith("(")) {
-        // Continuation line like "(auto-refreshed)" — append to previous description
-        if (tokens.length > 0 && cells.length >= 1) {
-          const prev = tokens[tokens.length - 1];
-          const extra = cells.join(" ").trim();
-          if (extra) {
-            prev.description = prev.description === "-"
-              ? extra
-              : `${prev.description} ${extra}`;
-          }
-        }
-        continue;
-      }
-
-      tokens.push({
-        name,
-        type: cells[1] || "-",
-        expires_in: cells[2] || "-",
-        refresh: cells[3] || "-",
-        created: cells[4] || "-",
-        description: cells[5] || "-",
-      });
-    }
-
-    return tokens;
-  }
 
   /** Inspect system state and return the first wizard step that is not yet complete */
   async wizardCheckpoint(): Promise<number> {
