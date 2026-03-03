@@ -3615,13 +3615,14 @@ function buildInstallHtml(): string {
 <style>
 ${CSS}
 .install-page { max-width: 560px; margin: 0 auto; padding: 48px 24px; }
+#wittySpinner { transition: opacity 0.3s ease; }
 </style>
 </head>
 <body>
   <div class="install-page" id="installPage">
     <div class="complete-hero">
       <h1 style="color: var(--fg); font-weight: 300; letter-spacing: -0.5px;">Installing modiq<span style="display:inline-block; width:0.52em; height:0.52em; background:#E87A2A; border-radius:50%; vertical-align:baseline; margin:0 0.01em; position:relative; top:-0.05em;"></span> dex</h1>
-      <div class="subtitle">Setting up the runtime, SDK, and toolchain.</div>
+      <div class="subtitle" id="wittySpinner">Warming up the memory engine...</div>
     </div>
     <div class="pipeline-progress-wrap" style="margin-top:32px;">
       <div class="pipeline-progress-label">
@@ -3671,7 +3672,7 @@ ${CSS}
               <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5a5.5 5.5 0 110 11 5.5 5.5 0 010-11z"/><circle cx="8" cy="6" r="1.5"/><path d="M8 8.5v3"/></svg>
             </div>
             <div class="pipeline-info">
-              <div class="pipeline-name">Deno Runtime</div>
+              <div class="pipeline-name">Memory Runner</div>
               <div class="pipeline-status" id="status-deno">Waiting</div>
             </div>
             <div class="pipeline-badge queued" id="badge-deno">Queued</div>
@@ -3686,7 +3687,7 @@ ${CSS}
               <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2L1 5.5 4.5 9l1-1L3 5.5 5.5 3l-1-1zm7 0l-1 1L13 5.5 10.5 8l1 1L15 5.5 11.5 2zM6 12l2-10h1.5l-2 10H6z"/></svg>
             </div>
             <div class="pipeline-info">
-              <div class="pipeline-name">TypeScript SDK</div>
+              <div class="pipeline-name">Memory Templates</div>
               <div class="pipeline-status" id="status-sdk">Waiting</div>
             </div>
             <div class="pipeline-badge queued" id="badge-sdk">Queued</div>
@@ -3744,6 +3745,32 @@ ${CSS}
       if (textEl) textEl.textContent = done + ' of ' + total + ' complete';
     }
 
+    // Witty rotating messages inspired by "How it works"
+    const wittyMessages = [
+      'Warming up the memory engine...',
+      'Teaching APIs to remember things...',
+      'Encoding context into long-term memory...',
+      'Giving your APIs photographic recall...',
+      'Wiring neurons between your services...',
+      'Building bridges to 635+ APIs...',
+      'Compiling muscle memory for your workflows...',
+      'Storing retrieval cues for later...',
+      'Indexing the collective API unconscious...',
+      'Preparing episodic memory buffers...',
+    ];
+    let wittyIdx = 0;
+    const wittyEl = document.getElementById('wittySpinner');
+    const wittyInterval = setInterval(() => {
+      wittyIdx = (wittyIdx + 1) % wittyMessages.length;
+      if (wittyEl) {
+        wittyEl.style.opacity = '0';
+        setTimeout(() => {
+          wittyEl.textContent = wittyMessages[wittyIdx];
+          wittyEl.style.opacity = '1';
+        }, 300);
+      }
+    }, 3000);
+
     window.addEventListener('message', (e) => {
       const msg = e.data;
       if (msg.type === 'install-step') {
@@ -3753,6 +3780,8 @@ ${CSS}
         for (let i = 0; i < idx; i++) completeStep(STEPS[i]);
         updateProgress(idx, STEPS.length);
       } else if (msg.type === 'install-done') {
+        clearInterval(wittyInterval);
+        if (wittyEl) wittyEl.textContent = 'All set — your memory layer is ready.';
         STEPS.forEach(s => completeStep(s));
         updateProgress(STEPS.length, STEPS.length);
         const fill = document.getElementById('progressFill');
@@ -3768,6 +3797,8 @@ ${CSS}
           done.innerHTML = '<div style="text-align:center; margin-top:28px;"><button class="btn btn-primary" onclick="vscode.postMessage({type:\\'install-complete\\'})">Begin Setup \\u2192</button></div>';
         }
       } else if (msg.type === 'install-error') {
+        clearInterval(wittyInterval);
+        if (wittyEl) wittyEl.textContent = 'Something went wrong.';
         failStep(msg.step || 'download', msg.message);
         const textEl = document.getElementById('progressText');
         if (textEl) { textEl.textContent = 'Installation failed'; textEl.style.color = 'var(--error)'; }
