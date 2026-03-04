@@ -86,6 +86,8 @@ export class FlowTreeProvider
         } catch { /* no adapters dir */ }
         this.flows = allFlows.filter((f) => {
           if (!f.adapter) { return true; }
+          // Non-adapter flows (e.g. stdio://playwright) don't require an installed adapter
+          if (!f.adapter.startsWith("adapter/")) { return true; }
           const adapterId = f.adapter.replace("adapter/", "");
           return installedIds.has(adapterId);
         });
