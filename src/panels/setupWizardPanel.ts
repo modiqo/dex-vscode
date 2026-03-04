@@ -4074,8 +4074,13 @@ ${CSS}
     const eduHeadline = document.getElementById('eduHeadline');
     const eduBody = document.getElementById('eduBody');
 
-    function showEduSlide(idx) {
+    function showEduSlide(idx, immediate) {
       const slide = eduSlides[idx % eduSlides.length];
+      if (immediate) {
+        if (eduHeadline) eduHeadline.textContent = slide.headline;
+        if (eduBody) eduBody.textContent = slide.body;
+        return;
+      }
       if (eduCard) eduCard.style.opacity = '0';
       setTimeout(() => {
         if (eduHeadline) eduHeadline.textContent = slide.headline;
@@ -4084,7 +4089,7 @@ ${CSS}
       }, 350);
     }
 
-    showEduSlide(0);
+    showEduSlide(0, true);
     const eduInterval = setInterval(() => {
       eduIdx = (eduIdx + 1) % eduSlides.length;
       showEduSlide(eduIdx);
