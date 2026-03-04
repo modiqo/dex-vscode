@@ -181,15 +181,18 @@ export function activate(context: vscode.ExtensionContext): void {
           flowTree.refresh();
           workspaceTree.refresh();
           statusBar.refresh();
+          setupTree.refresh();
         },
         onTokensConfigured: () => {
           updateDexReadyContext();
           vaultTree.refresh();
           adapterTree.refresh();
           statusBar.refresh();
+          setupTree.refresh();
         },
         onProofComplete: () => {
           workspaceTree.refresh();
+          setupTree.refresh();
         },
         onComplete: () => {
           setupTree.setStatus("complete");
