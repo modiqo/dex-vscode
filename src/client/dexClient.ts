@@ -565,7 +565,7 @@ export class DexClient {
   async registrySkillList(community: string): Promise<RegistrySkill[]> {
     try {
       const text = await this.execText([
-        "registry", "skill", "list", "--community", community,
+        "registry", "flow", "list", "--community", community,
       ]);
       return this.parseRegistrySkillTable(text);
     } catch {
@@ -622,7 +622,7 @@ export class DexClient {
     for (const line of text.split("\n")) {
       const trimmed = line.trim();
 
-      if (trimmed.startsWith("@@skills")) {
+      if (trimmed.startsWith("@@flows") || trimmed.startsWith("@@skills")) {
         inSkills = true;
         continue;
       }
@@ -754,7 +754,7 @@ export class DexClient {
     // Find skills associated with this adapter via fingerprint lookup
     let findOutput: string;
     try {
-      findOutput = await this.execText(["registry", "skill", "find-by-adapter", adapterId]);
+      findOutput = await this.execText(["registry", "flow", "find-by-adapter", adapterId]);
     } catch {
       return 0;
     }
@@ -772,7 +772,7 @@ export class DexClient {
       alreadyPulled?.add(skillRef);
 
       try {
-        const child = spawn(this.dexPath, ["registry", "skill", "pull", skillRef], {
+        const child = spawn(this.dexPath, ["registry", "flow", "pull", skillRef], {
           stdio: ["pipe", "pipe", "pipe"],
           env: { ...process.env },
         });

@@ -340,7 +340,7 @@ export class ExploreViewProvider implements vscode.WebviewViewProvider {
       // Skills section
       if (hasSkills) {
         html += '<div class="section-header" data-action="focus-flows">';
-        html += '&#9889; Skills (' + result.skills.length + ')';
+        html += '&#9889; Flows (' + result.skills.length + ')';
         html += '</div>';
         for (const s of result.skills) {
           html += '<div class="result-item" data-action="focus-flows">';
