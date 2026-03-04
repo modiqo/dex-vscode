@@ -126,32 +126,42 @@ export function activate(context: vscode.ExtensionContext): void {
         env: { ...process.env },
       });
 
-      // Start at binary step immediately — download IS binary install
+      // Start at binary step immediately
       let currentStep = "binary";
       panel.webview.postMessage({ type: "install-step", step: "binary" });
 
-      const STEP_ORDER = ["download", "binary", "deno", "sdk"];
-      const advance = (text: string) => {
-        const lower = text.toLowerCase();
-        let nextStep: string | null = null;
-        if (lower.includes("deno") && currentStep !== "deno" && currentStep !== "sdk") {
-          nextStep = "deno";
-        } else if ((lower.includes("sdk") || lower.includes("typescript")) && currentStep !== "sdk") {
-          nextStep = "sdk";
-        }
-        if (nextStep && STEP_ORDER.indexOf(nextStep) > STEP_ORDER.indexOf(currentStep)) {
-          currentStep = nextStep;
-          panel.webview.postMessage({ type: "install-step", step: nextStep });
-        }
+      const home = process.env.HOME || require("os").homedir();
+      const { access: fsAccess } = await import("fs/promises");
+      const exists = (p: string) => fsAccess(p).then(() => true).catch(() => false);
+
+      // Poll filesystem — more reliable than parsing ANSI-escaped output
+      const STEP_ORDER = ["binary", "deno", "sdk"];
+      const stepChecks: Record<string, () => Promise<boolean>> = {
+        // binary: dex binary landed in ~/.local/bin
+        binary: () => exists(`${home}/.local/bin/dex`),
+        // deno: deno runtime installed to ~/.dex/bin
+        deno: () => exists(`${home}/.dex/bin/deno`),
+        // sdk: node runtime installed to ~/.dex/bin (sdk step installs node/npm/npx)
+        sdk: () => exists(`${home}/.dex/bin/node`),
       };
 
-      child.stdout?.on("data", (data: Buffer) => advance(data.toString()));
-      child.stderr?.on("data", (data: Buffer) => advance(data.toString()));
+      const pollInterval = setInterval(async () => {
+        for (const step of STEP_ORDER) {
+          const idx = STEP_ORDER.indexOf(step);
+          const currentIdx = STEP_ORDER.indexOf(currentStep);
+          if (idx > currentIdx && await stepChecks[step]()) {
+            currentStep = step;
+            panel.webview.postMessage({ type: "install-step", step });
+          }
+        }
+      }, 500);
 
       const exitCode = await new Promise<number | null>((resolve) => {
         child.on("close", resolve);
         child.on("error", () => resolve(1));
       });
+
+      clearInterval(pollInterval);
 
       if (exitCode === 0) {
         panel.webview.postMessage({ type: "install-done" });
