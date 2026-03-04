@@ -126,19 +126,22 @@ export function activate(context: vscode.ExtensionContext): void {
         env: { ...process.env },
       });
 
-      let currentStep = "download";
+      // Start at binary step immediately — download IS binary install
+      let currentStep = "binary";
+      panel.webview.postMessage({ type: "install-step", step: "binary" });
 
+      const STEP_ORDER = ["download", "binary", "deno", "sdk"];
       const advance = (text: string) => {
         const lower = text.toLowerCase();
+        let nextStep: string | null = null;
         if (lower.includes("deno") && currentStep !== "deno" && currentStep !== "sdk") {
-          currentStep = "deno";
-          panel.webview.postMessage({ type: "install-step", step: "deno" });
+          nextStep = "deno";
         } else if ((lower.includes("sdk") || lower.includes("typescript")) && currentStep !== "sdk") {
-          currentStep = "sdk";
-          panel.webview.postMessage({ type: "install-step", step: "sdk" });
-        } else if ((lower.includes("install") || lower.includes("binary")) && currentStep === "download") {
-          currentStep = "binary";
-          panel.webview.postMessage({ type: "install-step", step: "binary" });
+          nextStep = "sdk";
+        }
+        if (nextStep && STEP_ORDER.indexOf(nextStep) > STEP_ORDER.indexOf(currentStep)) {
+          currentStep = nextStep;
+          panel.webview.postMessage({ type: "install-step", step: nextStep });
         }
       };
 
