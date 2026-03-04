@@ -51,7 +51,7 @@ export function createDexWatcher(
 
   watchDir(path.join(dexHome, "adapters"), onAdapters);
   watchDir(path.join(dexHome, "flows"), onFlows);
-  watchDir(path.join(dexHome, "workspaces"), onWorkspaces);
+  watchDir(path.join(dexHome, "dex", "workspaces"), onWorkspaces);
 
   // tokens is a file, watch its parent directory
   const tokensDir = path.join(dexHome, "config");
