@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as os from "os";
 import * as path from "path";
+import * as fs from "fs";
 
 export interface WatcherCallbacks {
   onAdaptersChanged: () => void;
@@ -10,7 +11,11 @@ export interface WatcherCallbacks {
 }
 
 /**
- * Watch ~/.dex for filesystem changes and trigger refresh callbacks.
+ * Watch ~/.dex subdirectories for filesystem changes.
+ *
+ * Uses Node.js fs.watch (recursive) instead of vscode.workspace.createFileSystemWatcher
+ * because VS Code's watcher is unreliable for paths outside the workspace when changes
+ * are made by external CLI processes.
  */
 export function createDexWatcher(
   callbacks: WatcherCallbacks
@@ -18,30 +23,43 @@ export function createDexWatcher(
   const dexHome = path.join(os.homedir(), ".dex");
   const disposables: vscode.Disposable[] = [];
 
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(vscode.Uri.file(dexHome), "**/*")
-  );
+  // Debounce to avoid multiple rapid-fire callbacks for a single CLI operation
+  const debounce = (fn: () => void, ms = 300) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    return () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(fn, ms);
+    };
+  };
 
-  const handleChange = (uri: vscode.Uri) => {
-    const p = uri.fsPath;
-    if (p.includes("/adapters/")) {
-      callbacks.onAdaptersChanged();
-    }
-    if (p.includes("/tokens")) {
-      callbacks.onTokensChanged();
-    }
-    if (p.includes("/flows/")) {
-      callbacks.onFlowsChanged();
-    }
-    if (p.includes("/workspaces/")) {
-      callbacks.onWorkspacesChanged();
+  const onAdapters = debounce(callbacks.onAdaptersChanged);
+  const onTokens = debounce(callbacks.onTokensChanged);
+  const onFlows = debounce(callbacks.onFlowsChanged);
+  const onWorkspaces = debounce(callbacks.onWorkspacesChanged);
+
+  const watches: fs.FSWatcher[] = [];
+
+  const watchDir = (dir: string, onChange: () => void) => {
+    fs.mkdirSync(dir, { recursive: true });
+    try {
+      const w = fs.watch(dir, { recursive: true }, () => onChange());
+      watches.push(w);
+    } catch {
+      // Directory may not exist yet on a fresh install — ignore
     }
   };
 
-  watcher.onDidChange(handleChange);
-  watcher.onDidCreate(handleChange);
-  watcher.onDidDelete(handleChange);
+  watchDir(path.join(dexHome, "adapters"), onAdapters);
+  watchDir(path.join(dexHome, "flows"), onFlows);
+  watchDir(path.join(dexHome, "workspaces"), onWorkspaces);
 
-  disposables.push(watcher);
+  // tokens is a file, watch its parent directory
+  const tokensDir = path.join(dexHome, "config");
+  watchDir(tokensDir, onTokens);
+
+  disposables.push({
+    dispose: () => watches.forEach((w) => w.close()),
+  });
+
   return disposables;
 }
