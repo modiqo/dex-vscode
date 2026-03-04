@@ -69,6 +69,7 @@ async function runDryRun(
 interface CreateConfig {
   baseUrl: string;
   group: string;
+  name?: string;
   description?: string;
   configJson?: {
     auth?: Record<string, unknown>;
@@ -88,9 +89,10 @@ async function handleCreate(
 ): Promise<void> {
   panel.webview.postMessage({ type: "creating", message: "Starting adapter creation..." });
 
-  const options: { baseUrl?: string; group?: string; description?: string; configJson?: object } = {};
+  const options: { baseUrl?: string; group?: string; name?: string; description?: string; configJson?: object } = {};
   if (config.baseUrl) { options.baseUrl = config.baseUrl; }
   if (config.group) { options.group = config.group; }
+  if (config.name) { options.name = config.name; }
   if (config.description) { options.description = config.description; }
   if (config.configJson) { options.configJson = config.configJson; }
 
@@ -451,6 +453,14 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
     </div>
 
     <div class="card">
+      <h2>Name <span style="font-weight:400; font-size:0.85em; color:var(--fg-dim)">(optional)</span></h2>
+      <div class="form-group">
+        <input type="text" id="rv-name" placeholder="Human-friendly display name (defaults to adapter ID)" style="width:100%; box-sizing:border-box;" />
+        <div class="hint">Override the display name shown in adapter lists and search results</div>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Description <span style="font-weight:400; font-size:0.85em; color:var(--fg-dim)">(optional)</span></h2>
       <div class="form-group">
         <textarea id="rv-description" rows="3" placeholder="Describe this adapter's purpose for search discovery&#10;e.g. Workday HR platform for employee data, payroll, and absence management" style="resize:vertical; width:100%; box-sizing:border-box;"></textarea>
@@ -671,6 +681,8 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       const spec = data.spec;
 
       document.getElementById('rv-title').textContent = spec.title;
+      const nameInput = document.getElementById('rv-name');
+      if (nameInput && !nameInput.value) { nameInput.value = spec.title || ''; }
       document.getElementById('rv-version').textContent = spec.version;
       document.getElementById('rv-openapi').textContent = spec.openapi_version;
       document.getElementById('rv-baseurl').textContent = spec.base_url || '(not detected)';
@@ -1127,6 +1139,7 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       const baseUrlOverride = document.getElementById('rv-baseurl-override')?.value?.trim() || '';
       const baseUrl = baseUrlOverride || (dryRunData?.spec?.base_url || '');
       const group = document.getElementById('cfg-group')?.value?.trim() || '';
+      const name = document.getElementById('rv-name')?.value?.trim() || '';
       const description = document.getElementById('rv-description')?.value?.trim() || '';
 
       // Build configJson for --config-json flag
@@ -1154,6 +1167,7 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
         config: {
           baseUrl,
           group,
+          name: name || undefined,
           description: description || undefined,
           configJson: Object.keys(configJson).length > 0 ? configJson : undefined
         }
