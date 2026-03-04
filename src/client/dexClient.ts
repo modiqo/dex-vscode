@@ -269,7 +269,7 @@ export class DexClient {
   adapterCreateStream(
     id: string,
     specUrl: string,
-    options?: { baseUrl?: string; group?: string; configJson?: object }
+    options?: { baseUrl?: string; group?: string; description?: string; configJson?: object }
   ): ChildProcess {
     const args = ["adapter", "new", id, specUrl, "--yes"];
     if (options?.baseUrl) {
@@ -277,6 +277,9 @@ export class DexClient {
     }
     if (options?.group) {
       args.push("--group", options.group);
+    }
+    if (options?.description) {
+      args.push("--description", options.description);
     }
     if (options?.configJson) {
       args.push("--config-json", JSON.stringify(options.configJson));

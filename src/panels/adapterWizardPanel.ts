@@ -69,6 +69,7 @@ async function runDryRun(
 interface CreateConfig {
   baseUrl: string;
   group: string;
+  description?: string;
   configJson?: {
     auth?: Record<string, unknown>;
     additional_headers?: Record<string, string>;
@@ -87,9 +88,10 @@ async function handleCreate(
 ): Promise<void> {
   panel.webview.postMessage({ type: "creating", message: "Starting adapter creation..." });
 
-  const options: { baseUrl?: string; group?: string; configJson?: object } = {};
+  const options: { baseUrl?: string; group?: string; description?: string; configJson?: object } = {};
   if (config.baseUrl) { options.baseUrl = config.baseUrl; }
   if (config.group) { options.group = config.group; }
+  if (config.description) { options.description = config.description; }
   if (config.configJson) { options.configJson = config.configJson; }
 
   const child = client.adapterCreateStream(adapterId, specUrl, options);
@@ -449,7 +451,15 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
     </div>
 
     <div class="card">
-      <h2>Base URL Override (optional)</h2>
+      <h2>Description <span style="font-weight:400; font-size:0.85em; color:var(--fg-dim)">(optional)</span></h2>
+      <div class="form-group">
+        <textarea id="rv-description" rows="3" placeholder="Describe this adapter's purpose for search discovery&#10;e.g. Workday HR platform for employee data, payroll, and absence management" style="resize:vertical; width:100%; box-sizing:border-box;"></textarea>
+        <div class="hint">Helps discover this adapter through natural language queries</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Base URL Override <span style="font-weight:400; font-size:0.85em; color:var(--fg-dim)">(optional)</span></h2>
       <div class="form-group">
         <input type="text" id="rv-baseurl-override" placeholder="Leave empty to use detected URL" />
         <div class="hint">Override if the detected base URL is incorrect</div>
@@ -1117,6 +1127,7 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
       const baseUrlOverride = document.getElementById('rv-baseurl-override')?.value?.trim() || '';
       const baseUrl = baseUrlOverride || (dryRunData?.spec?.base_url || '');
       const group = document.getElementById('cfg-group')?.value?.trim() || '';
+      const description = document.getElementById('rv-description')?.value?.trim() || '';
 
       // Build configJson for --config-json flag
       const configJson = {};
@@ -1143,6 +1154,7 @@ function buildWizardHtml(adapterId: string, info: CatalogInfo): string {
         config: {
           baseUrl,
           group,
+          description: description || undefined,
           configJson: Object.keys(configJson).length > 0 ? configJson : undefined
         }
       });
