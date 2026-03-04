@@ -4019,8 +4019,7 @@ ${CSS}
 .edu-spinner { width:56px; height:56px; }
 .edu-ring { width:100%; height:100%; border-radius:50%; border:3px solid transparent; border-top-color:var(--accent); border-right-color:var(--accent); animation:edu-spin 1.2s linear infinite; }
 @keyframes edu-spin { to { transform:rotate(360deg); } }
-.edu-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; padding:24px 28px; text-align:center; transition:opacity 0.4s ease; min-height:130px; display:flex; flex-direction:column; align-items:center; gap:10px; }
-.edu-emoji { font-size:28px; line-height:1; }
+.edu-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; padding:24px 28px; text-align:center; transition:opacity 0.4s ease; min-height:100px; display:flex; flex-direction:column; align-items:center; gap:8px; }
 .edu-headline { font-size:15px; font-weight:600; letter-spacing:-0.2px; }
 .edu-body { font-size:12px; opacity:0.55; line-height:1.6; max-width:380px; }
 .edu-card.done { border-color:rgba(var(--glow-success), 0.3); }
@@ -4035,7 +4034,6 @@ ${CSS}
       <div class="edu-spinner"><div class="edu-ring" id="eduRing"></div></div>
     </div>
     <div class="edu-card" id="eduCard">
-      <div class="edu-emoji" id="eduEmoji">🧠</div>
       <div class="edu-headline" id="eduHeadline"></div>
       <div class="edu-body" id="eduBody"></div>
     </div>
@@ -4046,32 +4044,26 @@ ${CSS}
 
     const eduSlides = [
       {
-        emoji: '🔁',
         headline: 'Right now, an agent loop is running.',
         body: 'AI doesn\'t "think once." It loops: observe → plan → act → look again. Like a chef who keeps tasting while cooking. Endlessly.',
       },
       {
-        emoji: '🏆',
         headline: 'Reinforcement learning is just bribery with math.',
         body: 'Good output? Reward it. Bad output? Subtract points. Repeat across 10 billion examples. At some point, they started calling it intelligence.',
       },
       {
-        emoji: '📖',
         headline: 'The context window is working memory with a page limit.',
         body: 'Everything the AI knows mid-conversation lives on that page. When it fills up — the beginning disappears. Quietly. Permanently.',
       },
       {
-        emoji: '🔌',
         headline: 'MCP is a USB port for AI.',
         body: 'Model Context Protocol lets any AI plug into any tool — APIs, databases, files — without custom wiring. One standard. Everything talks.',
       },
       {
-        emoji: '✂️',
         headline: 'Context editing is the art of forgetting well.',
         body: 'Not everything deserves to stay on that page. Trim the noise. Pin the signal. The best AI systems curate memory like a good editor cuts prose.',
       },
       {
-        emoji: '👁️',
         headline: 'Attention heads are how AI reads.',
         body: 'Hundreds of tiny readers, each scanning the same sentence for different things — subject, tone, intent, contradiction. Their consensus is the answer.',
       },
@@ -4079,7 +4071,6 @@ ${CSS}
 
     let eduIdx = 0;
     const eduCard = document.getElementById('eduCard');
-    const eduEmoji = document.getElementById('eduEmoji');
     const eduHeadline = document.getElementById('eduHeadline');
     const eduBody = document.getElementById('eduBody');
 
@@ -4087,7 +4078,6 @@ ${CSS}
       const slide = eduSlides[idx % eduSlides.length];
       if (eduCard) eduCard.style.opacity = '0';
       setTimeout(() => {
-        if (eduEmoji) eduEmoji.textContent = slide.emoji;
         if (eduHeadline) eduHeadline.textContent = slide.headline;
         if (eduBody) eduBody.textContent = slide.body;
         if (eduCard) eduCard.style.opacity = '1';
@@ -4108,7 +4098,6 @@ ${CSS}
         if (ring) ring.style.animation = 'none';
         if (eduCard) eduCard.style.opacity = '0';
         setTimeout(() => {
-          if (eduEmoji) eduEmoji.textContent = '🎯';
           if (eduHeadline) eduHeadline.textContent = 'None of that matters for you.';
           if (eduBody) eduBody.textContent = 'Agent loops, attention heads, context windows \u2014 that\'s the engine room. You\'re the captain. Connect your APIs. Build workflows. dex handles the rest.';
           if (eduCard) { eduCard.style.opacity = '1'; eduCard.classList.add('done'); }
@@ -4123,7 +4112,6 @@ ${CSS}
         if (ring) ring.style.animation = 'none';
         if (eduCard) eduCard.style.opacity = '0';
         setTimeout(() => {
-          if (eduEmoji) eduEmoji.textContent = '⚠️';
           if (eduHeadline) eduHeadline.textContent = 'Something went wrong.';
           if (eduBody) eduBody.textContent = msg.message || 'Installation failed.';
           if (eduCard) eduCard.style.opacity = '1';
