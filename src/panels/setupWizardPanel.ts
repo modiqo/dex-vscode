@@ -8,6 +8,7 @@ interface SetupCallbacks {
   onComplete: () => void;
   onAdaptersInstalled?: () => void;
   onTokensConfigured?: () => void;
+  onProofComplete?: () => void;
 }
 
 let currentPanel: vscode.WebviewPanel | undefined;
@@ -91,6 +92,7 @@ export function showSetupWizardPanel(
       }
       case "run-proof-of-life": {
         await handleProofOfLife(panel, client, msg.adapters);
+        callbacks.onProofComplete?.();
         break;
       }
       case "load-token-requirements": {
@@ -241,7 +243,8 @@ async function handleInstallAdapters(
     });
   }
 
-  await Promise.all(adapterIds.map(async (id) => {
+  // Install sequentially to avoid registry.json write race conditions
+  for (const id of adapterIds) {
     const child = client.installAdapterStream(id);
     const logLines: string[] = [];
 
@@ -301,7 +304,7 @@ async function handleInstallAdapters(
         logs: recent,
       });
     }
-  }));
+  }
 }
 
 function handleOAuthGoogle(

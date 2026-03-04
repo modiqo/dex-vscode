@@ -188,6 +188,9 @@ export function activate(context: vscode.ExtensionContext): void {
           adapterTree.refresh();
           statusBar.refresh();
         },
+        onProofComplete: () => {
+          workspaceTree.refresh();
+        },
         onComplete: () => {
           setupTree.setStatus("complete");
           adapterTree.refresh();
