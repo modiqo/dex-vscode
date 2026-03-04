@@ -40,8 +40,8 @@ export function createDexWatcher(
   const watches: fs.FSWatcher[] = [];
 
   const watchDir = (dir: string, onChange: () => void) => {
-    fs.mkdirSync(dir, { recursive: true });
     try {
+      if (!fs.existsSync(dir)) { return; }
       const w = fs.watch(dir, { recursive: true }, () => onChange());
       watches.push(w);
     } catch {
