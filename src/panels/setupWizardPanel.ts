@@ -2887,7 +2887,7 @@ function renderAdapters(el) {
   if (registryAdapters.length === 0) {
     el.innerHTML = \`
       <h2 style="font-weight:300; letter-spacing:-0.5px;">API Catalog</h2>
-      <div class="subtitle">Loading available adapters from registry...</div>
+      <div class="subtitle">Setting up adapters — each one is a cheat sheet that teaches your agent an API's endpoints, auth, and workflows out of the box</div>
       <div style="text-align: center; padding: 40px;"><div class="spinner spinner-lg"></div></div>
     \`;
     return;
