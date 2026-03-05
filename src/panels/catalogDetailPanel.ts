@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { DexClient } from "../client/dexClient";
 import { parseCatalogInfo } from "../commands/browseCatalog";
 import { showAdapterWizardPanel } from "./adapterWizardPanel";
+import { showMcpConnectPanel } from "./mcpConnectPanel";
 
 export async function showCatalogDetailPanel(
   extensionUri: vscode.Uri,
@@ -35,11 +36,7 @@ export async function showCatalogDetailPanel(
       panel.dispose();
       if (isMcp) {
         const specUrl = info["Spec URL"] || "";
-        const cmd = client.newFromMcpCommand(adapterId, specUrl);
-        const terminal = vscode.window.createTerminal({ name: `dex: ${adapterId}` });
-        terminal.show();
-        terminal.sendText(cmd);
-        onAdapterCreated?.();
+        showMcpConnectPanel(adapterId, specUrl, onAdapterCreated);
       } else {
         showAdapterWizardPanel(
           extensionUri,
