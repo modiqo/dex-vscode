@@ -3247,7 +3247,7 @@ function showPassphraseModal() {
   overlay.id = 'passphraseModal';
   overlay.innerHTML = \`
     <div class="modal-box">
-      <h3>\\u{1F512} Vault Passphrase</h3>
+      <h3>Vault Passphrase</h3>
       <p class="modal-desc">Your passphrase decrypts the token vault locally.</p>
       <input type="password" class="passphrase-input" id="passphraseInput" placeholder="Enter passphrase..." autocomplete="off"/>
       <div class="modal-trust">\\u{1F513} Encrypted locally &middot; Never transmitted</div>
@@ -3312,16 +3312,26 @@ function handleVaultPullStatus(msg) {
     \`;
     var expiredTokens = (msg.vaultTokens || []).filter(function(t) { return t.expires_in === 'expired'; });
     if (expiredTokens.length > 0) {
+      var withRefresh = expiredTokens.filter(function(t) { return t.refresh && t.refresh !== '-'; });
+      var withoutRefresh = expiredTokens.filter(function(t) { return !t.refresh || t.refresh === '-'; });
       var warn = document.createElement('div');
       warn.style.cssText = 'margin-top:12px;margin-bottom:16px;padding:10px 14px;background:rgba(244,71,71,0.08);border:1px solid var(--error);border-radius:8px;';
       var warnTitle = document.createElement('div');
       warnTitle.style.cssText = 'font-size:12px;font-weight:600;color:var(--error);margin-bottom:6px;';
       warnTitle.textContent = expiredTokens.length + ' token' + (expiredTokens.length > 1 ? 's' : '') + ' may be expired';
-      var warnBody = document.createElement('div');
-      warnBody.style.cssText = 'font-size:11px;color:var(--fg-dim);line-height:1.5;';
-      warnBody.textContent = expiredTokens.map(function(t) { return t.name; }).join(', ') + ' — consider refreshing below.';
       warn.appendChild(warnTitle);
-      warn.appendChild(warnBody);
+      if (withRefresh.length > 0) {
+        var warnRefresh = document.createElement('div');
+        warnRefresh.style.cssText = 'font-size:11px;color:var(--fg-dim);line-height:1.5;margin-bottom:4px;';
+        warnRefresh.textContent = withRefresh.map(function(t) { return t.name; }).join(', ') + ' — refresh token detected, will auto-renew on next use.';
+        warn.appendChild(warnRefresh);
+      }
+      if (withoutRefresh.length > 0) {
+        var warnManual = document.createElement('div');
+        warnManual.style.cssText = 'font-size:11px;color:var(--fg-dim);line-height:1.5;';
+        warnManual.textContent = withoutRefresh.map(function(t) { return t.name; }).join(', ') + ' — no refresh token, update manually below.';
+        warn.appendChild(warnManual);
+      }
       statusEl.appendChild(warn);
     }
   } else {
