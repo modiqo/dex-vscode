@@ -344,23 +344,9 @@ function buildOverviewHtml(
 
     // Build a lookup: which adapter names does each skill reference
     function skillMatchesAdapter(skill, adapterName) {
-      const adaptersField = (skill.adapters || '').toLowerCase();
+      const adapters = Array.isArray(skill.adapters) ? skill.adapters : [];
       const name = adapterName.toLowerCase();
-      // Handle truncated names like "gemini-…" or "elevenl…" or "paralle…"
-      if (adaptersField.includes(name)) return true;
-      // Check if adapter name starts with the truncated adapter field
-      if (adaptersField.endsWith('\u2026') || adaptersField.endsWith('...')) {
-        const prefix = adaptersField.replace(/[\u2026.]+$/, '').trim();
-        if (name.startsWith(prefix)) return true;
-      }
-      // Check multi-adapter fields (comma separated)
-      const parts = adaptersField.split(/[,;]\\s*/);
-      for (const part of parts) {
-        const clean = part.replace(/[\\u2026.]+$/, '').trim();
-        if (clean && name.startsWith(clean)) return true;
-        if (name === clean) return true;
-      }
-      return false;
+      return adapters.some(a => a.toLowerCase() === name || name.startsWith(a.toLowerCase()));
     }
 
     skills.forEach(skill => {
@@ -417,7 +403,7 @@ function buildOverviewHtml(
     // ── Skill cards ──────────────────────────────────────────────
     const skillCards = document.getElementById('skill-cards');
     skills.forEach(s => {
-      const adapterNames = (s.adapters || '').split(/[,;]\\s*/).filter(Boolean);
+      const adapterNames = Array.isArray(s.adapters) ? s.adapters : [];
       const tags = adapterNames.map(n => '<span class="adapter-tag">' + escapeHtml(n) + '</span>').join('');
 
       const card = document.createElement('div');
@@ -447,14 +433,8 @@ function buildAdapterDetailHtml(
 ): string {
   // Find skills that reference this adapter
   const matchingSkills = allSkills.filter((s) => {
-    const adaptersField = (s.adapters || "").toLowerCase();
     const name = adapter.name.toLowerCase();
-    if (adaptersField.includes(name)) { return true; }
-    const parts = adaptersField.split(/[,;]\s*/);
-    return parts.some((p) => {
-      const clean = p.replace(/[\u2026.]+$/, "").trim();
-      return clean && name.startsWith(clean);
-    });
+    return (s.adapters || []).some((a) => a.toLowerCase() === name || name.startsWith(a.toLowerCase()));
   });
 
   const skillListHtml = matchingSkills.length > 0
@@ -597,10 +577,7 @@ function buildSkillDetailHtml(
   allAdapters: RegistryAdapter[]
 ): string {
   // Find matching adapters for this skill
-  const adapterNames = (skill.adapters || "")
-    .split(/[,;]\s*/)
-    .map((n) => n.replace(/[\u2026.]+$/, "").trim())
-    .filter(Boolean);
+  const adapterNames = skill.adapters || [];
 
   const matchingAdapters = allAdapters.filter((a) =>
     adapterNames.some((prefix) =>
@@ -721,7 +698,7 @@ function buildSkillDetailHtml(
     <h3>Details</h3>
     <div class="field-row">
       <div class="field-label">Adapters</div>
-      <div class="field-value">${escapeHtml(skill.adapters)}</div>
+      <div class="field-value">${escapeHtml((skill.adapters || []).join(", "))}</div>
     </div>
     <div class="field-row">
       <div class="field-label">Visibility</div>

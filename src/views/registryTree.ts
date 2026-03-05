@@ -95,7 +95,7 @@ export class RegistryTreeItem extends vscode.TreeItem {
 
       case "skill":
         if (this.registrySkill) {
-          this.description = this.registrySkill.adapters;
+          this.description = (this.registrySkill.adapters || []).join(", ");
           this.tooltip = new vscode.MarkdownString([
             `**${this.registrySkill.name}**`,
             "",
@@ -103,7 +103,7 @@ export class RegistryTreeItem extends vscode.TreeItem {
             "",
             `| Field | Value |`,
             `|-------|-------|`,
-            `| Adapters | ${this.registrySkill.adapters} |`,
+            `| Adapters | ${(this.registrySkill.adapters || []).join(", ")} |`,
             `| Visibility | ${this.registrySkill.visibility} |`,
           ].join("\n"));
           this.iconPath = new vscode.ThemeIcon("symbol-method");

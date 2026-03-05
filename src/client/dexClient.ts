@@ -77,7 +77,7 @@ export interface RegistryAdapter {
 export interface RegistrySkill {
   name: string;
   description: string;
-  adapters: string;
+  adapters: string[];
   visibility: string;
 }
 
@@ -559,9 +559,9 @@ export class DexClient {
   async registryAdapterList(community: string): Promise<RegistryAdapter[]> {
     try {
       const text = await this.execText([
-        "registry", "adapter", "list", "--community", community,
+        "registry", "adapter", "list", "--community", community, "--json",
       ]);
-      return this.parseRegistryAdapterTable(text);
+      return JSON.parse(text) as RegistryAdapter[];
     } catch {
       return [];
     }
@@ -571,9 +571,9 @@ export class DexClient {
   async registrySkillList(community: string): Promise<RegistrySkill[]> {
     try {
       const text = await this.execText([
-        "registry", "skill", "list", "--community", community,
+        "registry", "skill", "list", "--community", community, "--json",
       ]);
-      return this.parseRegistrySkillTable(text);
+      return JSON.parse(text) as RegistrySkill[];
     } catch {
       return [];
     }
@@ -1102,79 +1102,6 @@ export class DexClient {
     }
 
     return result;
-  }
-
-  /** Parse registry adapter table (│-delimited: Name | Fingerprint | Visibility | Description) */
-  private parseRegistryAdapterTable(text: string): RegistryAdapter[] {
-    const adapters: RegistryAdapter[] = [];
-    let currentAdapter: Partial<RegistryAdapter> | null = null;
-
-    for (const line of text.split("\n")) {
-      if (!line.includes("\u2502")) { continue; }
-
-      const cells = line.split("\u2502").map((c) => c.trim());
-      // Remove empty leading/trailing cells from box drawing
-      const filtered = cells.filter((_, i) => i > 0 && i < cells.length - 1);
-      if (filtered.length < 4) { continue; }
-
-      const [name, fingerprint, visibility, description] = filtered;
-
-      // Skip header row
-      if (name === "Name") { continue; }
-
-      if (name) {
-        // New adapter row
-        if (currentAdapter && currentAdapter.name) {
-          adapters.push(currentAdapter as RegistryAdapter);
-        }
-        currentAdapter = { name, fingerprint, visibility, description };
-      } else if (currentAdapter) {
-        // Continuation row — append description
-        currentAdapter.description =
-          (currentAdapter.description || "") + " " + description;
-      }
-    }
-
-    if (currentAdapter && currentAdapter.name) {
-      adapters.push(currentAdapter as RegistryAdapter);
-    }
-
-    return adapters;
-  }
-
-  /** Parse registry skill table (│-delimited: Name | Description | Adapters | Visibility) */
-  private parseRegistrySkillTable(text: string): RegistrySkill[] {
-    const skills: RegistrySkill[] = [];
-    let currentSkill: Partial<RegistrySkill> | null = null;
-
-    for (const line of text.split("\n")) {
-      if (!line.includes("\u2502")) { continue; }
-
-      const cells = line.split("\u2502").map((c) => c.trim());
-      const filtered = cells.filter((_, i) => i > 0 && i < cells.length - 1);
-      if (filtered.length < 4) { continue; }
-
-      const [name, description, adapters, visibility] = filtered;
-
-      // Skip header row
-      if (name === "Name") { continue; }
-
-      if (name) {
-        if (currentSkill && currentSkill.name) {
-          skills.push(currentSkill as RegistrySkill);
-        }
-        currentSkill = { name, description, adapters, visibility };
-      } else if (currentSkill) {
-        currentSkill.description =
-          (currentSkill.description || "") + " " + description;
-      }
-    }
-
-    if (currentSkill && currentSkill.name) {
-      skills.push(currentSkill as RegistrySkill);
-    }
-
-    return skills;
   }
 
   /** Parse adapter list table output into structured data.

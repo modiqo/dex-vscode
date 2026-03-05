@@ -217,9 +217,12 @@ function extractSummaryLines(output: string): string[] {
     .filter((l) => l.length > 0 && !l.startsWith("✓") && !l.match(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/));
 
   // Prefer lines with summary markers
-  const summaryIdx = lines.findLastIndex(
-    (l) => l.includes("Summary") || l.includes("═") || l.includes("📊")
-  );
+  const summaryIdx = (() => {
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].includes("Summary") || lines[i].includes("═") || lines[i].includes("📊")) { return i; }
+    }
+    return -1;
+  })();
   if (summaryIdx >= 0) {
     return lines.slice(summaryIdx).slice(0, 8);
   }
