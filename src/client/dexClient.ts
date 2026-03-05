@@ -290,6 +290,12 @@ export class DexClient {
     return this.execStream(args);
   }
 
+  /** Build the shell command to create an MCP adapter via DCR + OAuth.
+   *  Must be run in a terminal (not streamed) as it opens a browser for OAuth. */
+  newFromMcpCommand(id: string, mcpUrl: string): string {
+    return `${this.dexPath} adapter new-from-mcp ${id} ${mcpUrl}`;
+  }
+
   /** Run adapter dry-run to detect spec, toolsets, auth without creating.
    *  Returns structured JSON from `dex adapter new <id> <spec> --dry-run`.
    *  Uses extended timeout since large specs may take time to download/parse. */

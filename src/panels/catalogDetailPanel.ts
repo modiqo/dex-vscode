@@ -27,18 +27,28 @@ export async function showCatalogDetailPanel(
     { enableScripts: true },
   );
 
-  panel.webview.html = buildDetailHtml(adapterId, info);
+  const isMcp = (info["Spec Type"] || "").toLowerCase().includes("mcp");
+  panel.webview.html = buildDetailHtml(adapterId, info, isMcp);
 
   panel.webview.onDidReceiveMessage((msg) => {
     if (msg.type === "install") {
       panel.dispose();
-      showAdapterWizardPanel(
-        extensionUri,
-        client,
-        adapterId,
-        info,
-        onAdapterCreated || (() => {}),
-      );
+      if (isMcp) {
+        const specUrl = info["Spec URL"] || "";
+        const cmd = client.newFromMcpCommand(adapterId, specUrl);
+        const terminal = vscode.window.createTerminal({ name: `dex: ${adapterId}` });
+        terminal.show();
+        terminal.sendText(cmd);
+        onAdapterCreated?.();
+      } else {
+        showAdapterWizardPanel(
+          extensionUri,
+          client,
+          adapterId,
+          info,
+          onAdapterCreated || (() => {}),
+        );
+      }
     }
   });
 }
@@ -46,6 +56,7 @@ export async function showCatalogDetailPanel(
 function buildDetailHtml(
   adapterId: string,
   info: Record<string, string>,
+  isMcp = false,
 ): string {
   const provider = info["Provider"] || adapterId;
   const category = info["Category"] || "";
@@ -283,8 +294,8 @@ function buildDetailHtml(
   </div>
 
   <div class="install-section">
-    <button class="install-btn" onclick="vscode.postMessage({type:'install'})">Install Adapter</button>
-    <span class="install-cli">or run: dex adapter new ${esc(adapterId)}</span>
+    <button class="install-btn" onclick="vscode.postMessage({type:'install'})">${isMcp ? "Connect via OAuth" : "Install Adapter"}</button>
+    <span class="install-cli">or run: ${isMcp ? `dex adapter new-from-mcp ${esc(adapterId)} &lt;endpoint-url&gt;` : `dex adapter new ${esc(adapterId)}`}</span>
   </div>
 
   ${notes ? `<div class="notes">${esc(notes)}</div>` : ""}
