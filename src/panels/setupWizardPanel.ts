@@ -2062,6 +2062,177 @@ body.vscode-light .try-prompt { background: rgba(0,0,0,0.03); border: 1px solid 
 .log-buffer.errored .log-line:last-child { color: var(--error); }
 .log-buffer.errored .log-line:last-child::after { display: none; }
 
+/* ── Install pipeline ────────────────────── */
+.install-pipeline {
+  position: relative;
+  padding-left: 32px;
+}
+.install-pipeline::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.install-pipeline.all-done::before {
+  background: var(--success);
+}
+
+.pipeline-item {
+  position: relative;
+  padding: 0 0 28px 0;
+  animation: step-enter-forward 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pipeline-item:last-child { padding-bottom: 0; }
+
+/* Pipeline node dot */
+.pipeline-node {
+  position: absolute;
+  left: -32px;
+  top: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.pipeline-node.queued {
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+}
+.pipeline-node.queued::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.pipeline-node.active {
+  background: var(--accent);
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 4px rgba(var(--glow-color), 0.15);
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+.pipeline-node.active svg { color: #000; }
+
+.pipeline-node.success {
+  background: var(--success);
+  border: 2px solid var(--success);
+  animation: check-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pipeline-node.error {
+  background: var(--error);
+  border: 2px solid var(--error);
+}
+
+.pipeline-node svg { width: 12px; height: 12px; }
+
+/* Pipeline card content */
+.pipeline-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+.pipeline-item.active .pipeline-card {
+  border-color: var(--accent);
+  box-shadow: 0 4px 20px rgba(var(--glow-color), 0.08);
+}
+.pipeline-item.success .pipeline-card {
+  border-color: rgba(var(--glow-success), 0.3);
+}
+.pipeline-item.error .pipeline-card {
+  border-color: rgba(241, 76, 76, 0.3);
+}
+
+.pipeline-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.pipeline-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+body.vscode-dark .pipeline-icon { background: rgba(255,255,255,0.06); }
+body.vscode-light .pipeline-icon { background: rgba(0,0,0,0.04); }
+.pipeline-item.active .pipeline-icon { background: rgba(var(--glow-color), 0.1); }
+.pipeline-item.success .pipeline-icon { background: rgba(var(--glow-success), 0.1); }
+.pipeline-icon svg { width: 16px; height: 16px; opacity: 0.6; }
+.pipeline-item.active .pipeline-icon svg { opacity: 1; color: var(--accent); }
+.pipeline-item.success .pipeline-icon svg { opacity: 1; color: var(--success); }
+
+.pipeline-info { flex: 1; min-width: 0; }
+.pipeline-name { font-weight: 600; font-size: 13px; }
+.pipeline-status {
+  font-size: 11px;
+  opacity: 0.5;
+  margin-top: 2px;
+  transition: all 0.2s;
+}
+.pipeline-item.active .pipeline-status { opacity: 0.8; color: var(--accent); }
+.pipeline-item.success .pipeline-status { opacity: 1; color: var(--success); }
+.pipeline-item.error .pipeline-status { opacity: 1; color: var(--error); }
+
+.pipeline-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.pipeline-badge.queued { background: rgba(128,128,128,0.1); opacity: 0.4; }
+.pipeline-badge.active { background: rgba(var(--glow-color), 0.12); color: var(--accent); }
+.pipeline-badge.success { background: rgba(var(--glow-success), 0.12); color: var(--success); }
+.pipeline-badge.error { background: rgba(241,76,76,0.12); color: var(--error); }
+
+/* Pipeline terminal log */
+.pipeline-log {
+  border-top: 1px solid var(--border);
+  padding: 10px 16px 12px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  line-height: 1.6;
+  max-height: 80px;
+  overflow-y: auto;
+  transition: max-height 0.3s ease;
+}
+.pipeline-log .log-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+.pipeline-log .log-line:last-child { opacity: 0.8; color: var(--accent); }
+.pipeline-log .log-cursor {
+  display: inline;
+  animation: blink 1s step-end infinite;
+  color: var(--accent);
+}
+.pipeline-item.success .pipeline-log { display: none; }
+.pipeline-item.error .pipeline-log .log-line:last-child { color: var(--error); }
+
 /* Pipeline overall progress bar */
 .pipeline-progress-wrap {
   margin-bottom: 24px;
@@ -4015,112 +4186,193 @@ function buildInstallHtml(): string {
 <style>
 ${CSS}
 .install-page { max-width: 560px; margin: 0 auto; padding: 48px 24px; }
-.edu-spinner-wrap { display:flex; justify-content:center; margin:36px 0 24px; }
-.edu-spinner { width:56px; height:56px; }
-.edu-ring { width:100%; height:100%; border-radius:50%; border:3px solid transparent; border-top-color:var(--accent); border-right-color:var(--accent); animation:edu-spin 1.2s linear infinite; }
-@keyframes edu-spin { to { transform:rotate(360deg); } }
-.edu-card { background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; padding:24px 28px; text-align:center; transition:opacity 0.4s ease; min-height:100px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-.edu-headline { font-size:15px; font-weight:600; letter-spacing:-0.2px; }
-.edu-body { font-size:12px; opacity:0.55; line-height:1.6; max-width:380px; }
-.edu-card.done { border-color:rgba(var(--glow-success), 0.3); }
+#wittySpinner { transition: opacity 0.3s ease; }
 </style>
 </head>
 <body>
   <div class="install-page" id="installPage">
     <div class="complete-hero">
       <h1 style="color: var(--fg); font-weight: 300; letter-spacing: -0.5px;">Installing modiq<span style="display:inline-block; width:0.52em; height:0.52em; background:#E87A2A; border-radius:50%; vertical-align:baseline; margin:0 0.01em; position:relative; top:-0.05em;"></span> dex</h1>
+      <div class="subtitle" id="wittySpinner">Warming up the memory engine...</div>
     </div>
-    <div class="edu-spinner-wrap">
-      <div class="edu-spinner"><div class="edu-ring" id="eduRing"></div></div>
+    <div class="pipeline-progress-wrap" style="margin-top:32px;">
+      <div class="pipeline-progress-label">
+        <span class="pipeline-progress-text" id="progressText">Starting</span>
+        <span class="pipeline-progress-pct" id="progressPct">0%</span>
+      </div>
+      <div class="pipeline-track"><div class="pipeline-fill" id="progressFill" style="width:0%;"></div></div>
     </div>
-    <div class="edu-card" id="eduCard">
-      <div class="edu-headline" id="eduHeadline"></div>
-      <div class="edu-body" id="eduBody"></div>
+    <div class="install-pipeline" id="installPipeline" style="margin-top:24px;">
+      <div class="pipeline-item" id="step-download">
+        <div class="pipeline-node active" id="node-download">
+          <svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="3" fill="#fff"/></svg>
+        </div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v8.59L5.71 7.29 4.29 8.71l3 3a1 1 0 001.42 0l3-3-1.42-1.42L8 9.59V1H8zM3 13v1h10v-1H3z"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">Your tools just got a memory. Good luck keeping secrets.</div>
+              <div class="pipeline-status" id="status-download">Downloading installer...</div>
+            </div>
+            <div class="pipeline-badge active" id="badge-download">Running</div>
+          </div>
+        </div>
+      </div>
+      <div class="pipeline-item" id="step-binary">
+        <div class="pipeline-node queued" id="node-binary"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 1h6l3 3v9a2 2 0 01-2 2H4a2 2 0 01-2-2V3a2 2 0 012-2h1zm5 1.5V5h2.5L10 2.5zM6 8h4v1H6V8zm0 2h4v1H6v-1z"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">APIs connected. Context loaded. You just got smarter.</div>
+              <div class="pipeline-status" id="status-binary">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="badge-binary">Queued</div>
+          </div>
+        </div>
+      </div>
+      <div class="pipeline-item" id="step-deno">
+        <div class="pipeline-node queued" id="node-deno"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5a5.5 5.5 0 110 11 5.5 5.5 0 010-11z"/><circle cx="8" cy="6" r="1.5"/><path d="M8 8.5v3"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">Context window open. Tools indexed. Begin.</div>
+              <div class="pipeline-status" id="status-deno">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="badge-deno">Queued</div>
+          </div>
+        </div>
+      </div>
+      <div class="pipeline-item" id="step-sdk">
+        <div class="pipeline-node queued" id="node-sdk"></div>
+        <div class="pipeline-card">
+          <div class="pipeline-header">
+            <div class="pipeline-icon">
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2L1 5.5 4.5 9l1-1L3 5.5 5.5 3l-1-1zm7 0l-1 1L13 5.5 10.5 8l1 1L15 5.5 11.5 2zM6 12l2-10h1.5l-2 10H6z"/></svg>
+            </div>
+            <div class="pipeline-info">
+              <div class="pipeline-name">The boring part is done. The interesting part is yours.</div>
+              <div class="pipeline-status" id="status-sdk">Waiting</div>
+            </div>
+            <div class="pipeline-badge queued" id="badge-sdk">Queued</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="installDoneRow"></div>
   </div>
   <script>
     const vscode = acquireVsCodeApi();
+    const STEPS = ['download', 'binary', 'deno', 'sdk'];
+    const checkSvg = '<svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-    const eduSlides = [
-      {
-        headline: 'Right now, an agent loop is running.',
-        body: 'AI doesn\'t "think once." It loops: observe → plan → act → look again. Like a chef who keeps tasting while cooking. Endlessly.',
-      },
-      {
-        headline: 'Reinforcement learning is just bribery with math.',
-        body: 'Good output? Reward it. Bad output? Subtract points. Repeat across 10 billion examples. At some point, they started calling it intelligence.',
-      },
-      {
-        headline: 'The context window is working memory with a page limit.',
-        body: 'Everything the AI knows mid-conversation lives on that page. When it fills up — the beginning disappears. Quietly. Permanently.',
-      },
-      {
-        headline: 'MCP is a USB port for AI.',
-        body: 'Model Context Protocol lets any AI plug into any tool — APIs, databases, files — without custom wiring. One standard. Everything talks.',
-      },
-      {
-        headline: 'Context editing is the art of forgetting well.',
-        body: 'Not everything deserves to stay on that page. Trim the noise. Pin the signal. The best AI systems curate memory like a good editor cuts prose.',
-      },
-      {
-        headline: 'Attention heads are how AI reads.',
-        body: 'Hundreds of tiny readers, each scanning the same sentence for different things — subject, tone, intent, contradiction. Their consensus is the answer.',
-      },
-    ];
-
-    let eduIdx = 0;
-    const eduCard = document.getElementById('eduCard');
-    const eduHeadline = document.getElementById('eduHeadline');
-    const eduBody = document.getElementById('eduBody');
-
-    function showEduSlide(idx, immediate) {
-      const slide = eduSlides[idx % eduSlides.length];
-      if (immediate) {
-        if (eduHeadline) eduHeadline.textContent = slide.headline;
-        if (eduBody) eduBody.textContent = slide.body;
-        return;
-      }
-      if (eduCard) eduCard.style.opacity = '0';
-      setTimeout(() => {
-        if (eduHeadline) eduHeadline.textContent = slide.headline;
-        if (eduBody) eduBody.textContent = slide.body;
-        if (eduCard) eduCard.style.opacity = '1';
-      }, 350);
+    function activateStep(id) {
+      const item = document.getElementById('step-' + id);
+      const node = document.getElementById('node-' + id);
+      const badge = document.getElementById('badge-' + id);
+      const status = document.getElementById('status-' + id);
+      if (item) item.classList.add('active');
+      if (node) { node.className = 'pipeline-node active'; node.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="3" fill="#fff"/></svg>'; }
+      if (badge) { badge.className = 'pipeline-badge active'; badge.textContent = 'Running'; }
+      if (status) status.textContent = 'Installing...';
     }
 
-    showEduSlide(0, true);
-    const eduInterval = setInterval(() => {
-      eduIdx = (eduIdx + 1) % eduSlides.length;
-      showEduSlide(eduIdx);
-    }, 4500);
+    function completeStep(id) {
+      const item = document.getElementById('step-' + id);
+      const node = document.getElementById('node-' + id);
+      const badge = document.getElementById('badge-' + id);
+      const status = document.getElementById('status-' + id);
+      if (item) { item.classList.remove('active'); item.classList.add('success'); }
+      if (node) { node.className = 'pipeline-node success'; node.innerHTML = checkSvg; }
+      if (badge) { badge.className = 'pipeline-badge success'; badge.textContent = 'Done'; }
+      if (status) status.textContent = 'Complete';
+    }
+
+    function failStep(id, msg) {
+      const item = document.getElementById('step-' + id);
+      const node = document.getElementById('node-' + id);
+      const badge = document.getElementById('badge-' + id);
+      const status = document.getElementById('status-' + id);
+      if (item) { item.classList.remove('active'); item.classList.add('error'); }
+      if (node) { node.className = 'pipeline-node error'; node.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>'; }
+      if (badge) { badge.className = 'pipeline-badge error'; badge.textContent = 'Failed'; }
+      if (status) status.textContent = msg || 'Error';
+    }
+
+    function updateProgress(done, total) {
+      const pct = Math.round((done / total) * 100);
+      const fill = document.getElementById('progressFill');
+      const pctEl = document.getElementById('progressPct');
+      const textEl = document.getElementById('progressText');
+      if (fill) fill.style.width = pct + '%';
+      if (pctEl) pctEl.textContent = pct + '%';
+      if (textEl) textEl.textContent = done + ' of ' + total + ' complete';
+    }
+
+    // Witty rotating messages inspired by "How it works"
+    const wittyMessages = [
+      'Warming up the memory engine...',
+      'Teaching APIs to remember things...',
+      'Encoding context into long-term memory...',
+      'Giving your APIs photographic recall...',
+      'Wiring neurons between your services...',
+      'Building bridges to 635+ APIs...',
+      'Compiling muscle memory for your workflows...',
+      'Storing retrieval cues for later...',
+      'Indexing the collective API unconscious...',
+      'Preparing episodic memory buffers...',
+    ];
+    let wittyIdx = 0;
+    const wittyEl = document.getElementById('wittySpinner');
+    const wittyInterval = setInterval(() => {
+      wittyIdx = (wittyIdx + 1) % wittyMessages.length;
+      if (wittyEl) {
+        wittyEl.style.opacity = '0';
+        setTimeout(() => {
+          wittyEl.textContent = wittyMessages[wittyIdx];
+          wittyEl.style.opacity = '1';
+        }, 300);
+      }
+    }, 3000);
 
     window.addEventListener('message', (e) => {
       const msg = e.data;
-      if (msg.type === 'install-done') {
-        clearInterval(eduInterval);
-        const ring = document.getElementById('eduRing');
-        if (ring) ring.style.animation = 'none';
-        if (eduCard) eduCard.style.opacity = '0';
-        setTimeout(() => {
-          if (eduHeadline) eduHeadline.textContent = 'None of that matters for you.';
-          if (eduBody) eduBody.textContent = 'Agent loops, attention heads, context windows \u2014 that\'s the engine room. You\'re the captain. Connect your APIs. Build workflows. dex handles the rest.';
-          if (eduCard) { eduCard.style.opacity = '1'; eduCard.classList.add('done'); }
-        }, 400);
+      if (msg.type === 'install-step') {
+        activateStep(msg.step);
+        // Complete previous steps
+        const idx = STEPS.indexOf(msg.step);
+        for (let i = 0; i < idx; i++) completeStep(STEPS[i]);
+        updateProgress(idx, STEPS.length);
+      } else if (msg.type === 'install-done') {
+        clearInterval(wittyInterval);
+        if (wittyEl) wittyEl.textContent = 'All set — your memory layer is ready.';
+        STEPS.forEach(s => completeStep(s));
+        updateProgress(STEPS.length, STEPS.length);
+        const fill = document.getElementById('progressFill');
+        const pctEl = document.getElementById('progressPct');
+        const textEl = document.getElementById('progressText');
+        if (fill) fill.classList.add('done');
+        if (pctEl) pctEl.classList.add('done');
+        if (textEl) { textEl.classList.add('done'); textEl.textContent = 'Installation complete'; }
+        const pipeline = document.getElementById('installPipeline');
+        if (pipeline) pipeline.classList.add('all-done');
         const done = document.getElementById('installDoneRow');
         if (done) {
           done.innerHTML = '<div style="text-align:center; margin-top:28px;"><button class="btn btn-primary" onclick="vscode.postMessage({type:\\'install-complete\\'})">Begin Setup \\u2192</button></div>';
         }
       } else if (msg.type === 'install-error') {
-        clearInterval(eduInterval);
-        const ring = document.getElementById('eduRing');
-        if (ring) ring.style.animation = 'none';
-        if (eduCard) eduCard.style.opacity = '0';
-        setTimeout(() => {
-          if (eduHeadline) eduHeadline.textContent = 'Something went wrong.';
-          if (eduBody) eduBody.textContent = msg.message || 'Installation failed.';
-          if (eduCard) eduCard.style.opacity = '1';
-        }, 350);
+        clearInterval(wittyInterval);
+        if (wittyEl) wittyEl.textContent = 'Something went wrong.';
+        failStep(msg.step || 'download', msg.message);
+        const textEl = document.getElementById('progressText');
+        if (textEl) { textEl.textContent = 'Installation failed'; textEl.style.color = 'var(--error)'; }
         const done = document.getElementById('installDoneRow');
         if (done) {
           done.innerHTML = '<div style="text-align:center; margin-top:28px;"><div class="muted" style="margin-bottom:8px;">Try running manually:</div><div class="try-prompt" style="display:inline-block;"><code>curl -fsSL https://raw.githubusercontent.com/modiqo/dex-releases/main/install.sh | bash</code></div></div>';
