@@ -10,10 +10,12 @@ type NodeKind =
   | "section"
   | "detail"
   | "log-entry"
-  | "policy-section";
+  | "policy-section"
+  | "policy-subsection";
 
 export class AdapterTreeItem extends vscode.TreeItem {
   public policyData?: Record<string, unknown>;
+  public policySubKind?: "config" | "live-stats";
 
   constructor(
     public readonly adapter: Adapter,
@@ -75,6 +77,10 @@ export class AdapterTreeItem extends vscode.TreeItem {
 
       case "policy-section":
         this.contextValue = "adapter-policy";
+        break;
+
+      case "policy-subsection":
+        this.contextValue = "adapter-policy-sub";
         break;
     }
   }
@@ -146,6 +152,16 @@ export class AdapterTreeProvider
       if (sectionLabel === "Info") { return this.buildInfoRows(element.adapter); }
       if (sectionLabel.startsWith("Logs")) { return this.buildLogRows(element.adapter); }
       if (sectionLabel === "Policies") { return this.buildPolicyRows(element.adapter); }
+    }
+
+    // Policy subsection → Config or Live Stats
+    if (element.kind === "policy-subsection") {
+      if (element.policySubKind === "config") {
+        return this.buildPolicyConfigRows(element.adapter);
+      }
+      if (element.policySubKind === "live-stats") {
+        return this.buildPolicyLiveStats(element.adapter);
+      }
     }
 
     // Policy sub-section → detail rows
@@ -336,6 +352,30 @@ export class AdapterTreeProvider
   // ── Policy rows ─────────────────────────────────────────────────
 
   private buildPolicyRows(a: Adapter): AdapterTreeItem[] {
+    const rows: AdapterTreeItem[] = [];
+
+    // Config subtree
+    const configItem = new AdapterTreeItem(
+      a, "policy-subsection", vscode.TreeItemCollapsibleState.Collapsed,
+      "Config", this.extUri
+    );
+    configItem.iconPath = new vscode.ThemeIcon("settings-gear");
+    configItem.policySubKind = "config";
+    rows.push(configItem);
+
+    // Live Stats subtree
+    const liveItem = new AdapterTreeItem(
+      a, "policy-subsection", vscode.TreeItemCollapsibleState.Collapsed,
+      "Live Stats (24h)", this.extUri
+    );
+    liveItem.iconPath = new vscode.ThemeIcon("pulse");
+    liveItem.policySubKind = "live-stats";
+    rows.push(liveItem);
+
+    return rows;
+  }
+
+  private buildPolicyConfigRows(a: Adapter): AdapterTreeItem[] {
     const policyPath = path.join(os.homedir(), ".dex", "adapters", a.id, "config", "policies.json");
     try {
       const content = fs.readFileSync(policyPath, "utf-8");
@@ -371,6 +411,30 @@ export class AdapterTreeProvider
       return rows;
     } catch {
       return [this.detailRow(a, "Unable to read policies")];
+    }
+  }
+
+  private async buildPolicyLiveStats(a: Adapter): Promise<AdapterTreeItem[]> {
+    try {
+      const data = await this.client.execJson<PsEndpointJson>(
+        ["ps", "--json", "--endpoint", `adapter/${a.id}`, "--detailed", "--window", "24h"]
+      );
+      const rows: AdapterTreeItem[] = [];
+      rows.push(this.detailRow(a, `Requests: ${data.total_requests}`));
+      rows.push(this.detailRow(a, `Success rate: ${(data.success_rate * 100).toFixed(1)}%`));
+
+      const pv = data.policy_violations;
+      rows.push(this.detailRow(a, `Policy rejected: ${pv.total}`));
+      rows.push(this.detailRow(a, `Rate limit rejects: ${pv.rate_limit}`));
+      rows.push(this.detailRow(a, `Circuit breaker trips: ${pv.circuit_breaker}`));
+      rows.push(this.detailRow(a, `Violation rate: ${(pv.violation_rate * 100).toFixed(1)}%`));
+
+      rows.push(this.detailRow(a, `p50 latency: ${data.latency.p50.toFixed(0)}ms`));
+      rows.push(this.detailRow(a, `p95 latency: ${data.latency.p95.toFixed(0)}ms`));
+      rows.push(this.detailRow(a, `Estimated cost: $${data.estimated_cost.toFixed(4)}`));
+      return rows;
+    } catch {
+      return [this.detailRow(a, "No stats available")];
     }
   }
 
@@ -429,4 +493,25 @@ export class AdapterTreeProvider
       return ts;
     }
   }
+}
+
+/** Shape of `dex ps --json --endpoint X --detailed` */
+interface PsEndpointJson {
+  endpoint: string;
+  window: string;
+  total_requests: number;
+  successful: number;
+  failed: number;
+  success_rate: number;
+  latency: { p50: number; p95: number; p99: number; avg: number };
+  tokens: { request: number; response: number; total: number };
+  estimated_cost: number;
+  activity: { rps: number; active_sessions: number };
+  policy_violations: {
+    total: number;
+    rate_limit: number;
+    circuit_breaker: number;
+    violation_rate: number;
+    last_violation: string | null;
+  };
 }
