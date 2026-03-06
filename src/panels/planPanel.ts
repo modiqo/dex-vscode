@@ -107,7 +107,7 @@ function buildPlanData(
       try {
         const resp = JSON.parse(fs.readFileSync(responseFile, "utf-8"));
         durationMs = resp.response?.duration_ms ?? 0;
-        hasError = (resp.response?.status ?? 200) >= 400;
+        hasError = ((resp.response?.status ?? 200) >= 400) || (resp.response?.body?.is_error === true);
       } catch { /* skip */ }
     }
 

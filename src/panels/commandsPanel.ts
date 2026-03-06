@@ -20,6 +20,7 @@ interface ResponsePair {
   request: Record<string, unknown>;
   response: Record<string, unknown>;
   status?: number;
+  isError?: boolean;
   method?: string;
   toolName?: string;
 }
@@ -92,6 +93,7 @@ function loadResponses(wsDir: string): ResponsePair[] {
       request: data.request || {},
       response: data.response || {},
       status: data.response?.status,
+      isError: data.response?.body?.is_error === true,
       method: reqBody.method as string,
       toolName,
     };
@@ -404,7 +406,8 @@ function buildCommandsHtml(
 
       let badge = '';
       if (hasResponse && status !== null) {
-        const cls = status >= 200 && status < 400 ? 'badge-ok' : 'badge-err';
+        const isErr = status >= 400 || (resp && resp.isError);
+        const cls = isErr ? 'badge-err' : 'badge-ok';
         badge = '<span class="response-badge ' + cls + '">' + rid + '</span>';
       }
 
@@ -434,8 +437,10 @@ function buildCommandsHtml(
       html += '<div class="pair-header">';
       html += '<span class="rid">#' + cmd.sequence + ' ' + cmd.command + '</span>';
       if (resp) {
-        const statusCls = resp.status >= 200 && resp.status < 400 ? 'badge-ok' : 'badge-err';
-        html += '<span class="status ' + statusCls + '">' + resp.status + '</span>';
+        const isErr = resp.status >= 400 || resp.isError;
+        const statusCls = isErr ? 'badge-err' : 'badge-ok';
+        const statusLabel = resp.isError ? resp.status + ' (error)' : '' + resp.status;
+        html += '<span class="status ' + statusCls + '">' + statusLabel + '</span>';
         html += '<span class="tool-name">' + escapeHtmlJs(resp.toolName || '') + '</span>';
       }
       html += '</div>';

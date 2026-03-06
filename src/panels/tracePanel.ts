@@ -165,7 +165,7 @@ function buildTraceData(
           tokensOut = tokens.response_tokens ?? 0;
           tokensTotal = tokens.total_tokens ?? 0;
         }
-        hasError = resp.response?.status >= 400;
+        hasError = (resp.response?.status >= 400) || (resp.response?.body?.is_error === true);
       } catch { /* skip */ }
     }
 
