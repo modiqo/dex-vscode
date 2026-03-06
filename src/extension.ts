@@ -399,8 +399,25 @@ export function activate(context: vscode.ExtensionContext): void {
                     installed.map((a) => a.id.toLowerCase())
                   );
 
+                  // Read stdio MCP servers so we skip them (they aren't registry adapters)
+                  const stdioSet = new Set<string>();
+                  try {
+                    const { readFileSync } = await import("fs");
+                    const { join } = await import("path");
+                    const { homedir } = await import("os");
+                    const mcpPath = join(homedir(), ".dex", "config", "mcp.json");
+                    const mcpData = JSON.parse(readFileSync(mcpPath, "utf-8"));
+                    for (const key of Object.keys(mcpData?.mcpServers || {})) {
+                      stdioSet.add(key.toLowerCase());
+                    }
+                  } catch { /* no mcp.json */ }
+
                   for (const adapterId of adapterIds) {
                     if (installedSet.has(adapterId.toLowerCase())) {
+                      continue;
+                    }
+                    // stdio MCP servers (e.g. playwright-nosandbox) are not registry adapters
+                    if (stdioSet.has(adapterId.toLowerCase())) {
                       continue;
                     }
                     progress.report({ message: `Pulling required adapter ${adapterId}...` });
