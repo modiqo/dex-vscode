@@ -43,7 +43,7 @@ export function showRegistryOverviewPanel(
 ): void {
   const panel = vscode.window.createWebviewPanel(
     "modiqo.registryOverview",
-    "Registry: bootstrap",
+    "Hub: Community",
     vscode.ViewColumn.One,
     { enableScripts: true }
   );
@@ -291,8 +291,8 @@ function buildOverviewHtml(
 </head>
 <body>
   <div class="header">
-    <h1>Registry</h1>
-    <div class="subtitle">bootstrap community</div>
+    <h1>Hub</h1>
+    <div class="subtitle">community</div>
   </div>
 
   <!-- Relationship graph -->
@@ -319,7 +319,7 @@ function buildOverviewHtml(
 
   <div class="tooltip" id="tooltip"></div>
 
-  <footer>modiqo &middot; registry</footer>
+  <footer>modiqo &middot; hub</footer>
 
   <script>
     const adapters = ${adaptersJson};
@@ -565,7 +565,7 @@ function buildAdapterDetailHtml(
 
   <div class="install-cmd">dex registry adapter pull bootstrap/${escapeHtml(adapter.name)}</div>
 
-  <footer>modiqo &middot; registry</footer>
+  <footer>modiqo &middot; hub</footer>
 </body>
 </html>`;
 }
@@ -713,7 +713,7 @@ function buildSkillDetailHtml(
 
   <div class="install-cmd">dex registry skill pull bootstrap/${escapeHtml(skill.name)}</div>
 
-  <footer>modiqo &middot; registry</footer>
+  <footer>modiqo &middot; hub</footer>
 </body>
 </html>`;
 }

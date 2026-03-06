@@ -68,7 +68,7 @@
         },
         {
           "id": "modiqo-registry",
-          "name": "Registry",
+          "name": "Hub",
           "type": "tree",
           "when": "modiqo.setupStep >= 2"
         },
@@ -187,25 +187,37 @@
       },
       {
         "command": "modiqo.refreshRegistry",
-        "title": "Refresh Registry",
+        "title": "Refresh Hub",
         "category": "modiqo",
         "icon": "$(refresh)"
       },
       {
         "command": "modiqo.registryLogin",
-        "title": "Registry Login",
+        "title": "Hub Login",
         "category": "modiqo"
       },
       {
         "command": "modiqo.showRegistryDetail",
-        "title": "Show Registry Detail",
+        "title": "Show Hub Detail",
         "category": "modiqo"
       },
       {
         "command": "modiqo.showRegistryOverview",
-        "title": "Show Registry Overview",
+        "title": "Show Hub Overview",
         "category": "modiqo",
         "icon": "$(graph)"
+      },
+      {
+        "command": "modiqo.pullAdapter",
+        "title": "Pull Adapter",
+        "category": "modiqo",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "modiqo.pullFlow",
+        "title": "Pull Flow",
+        "category": "modiqo",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "modiqo.refreshVault",
@@ -328,6 +340,14 @@
         {
           "command": "modiqo.registryLogin",
           "when": "view == modiqo-registry && viewItem == registry-login"
+        },
+        {
+          "command": "modiqo.pullAdapter",
+          "when": "view == modiqo-registry && viewItem == registry-adapter"
+        },
+        {
+          "command": "modiqo.pullFlow",
+          "when": "view == modiqo-registry && viewItem == registry-skill"
         }
       ]
     },
@@ -362,5 +382,8 @@
     "mocha": "^10.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.56.1"
+  },
+  "dependencies": {
+    "lottie-web": "^5.13.0"
   }
 }

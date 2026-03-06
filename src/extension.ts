@@ -14,7 +14,7 @@ import { showTracePanel } from "./panels/tracePanel";
 import { showCommandsPanel } from "./panels/commandsPanel";
 import { showStatsPanel } from "./panels/statsPanel";
 import { showPlanPanel } from "./panels/planPanel";
-import { RegistryTreeProvider } from "./views/registryTree";
+import { RegistryTreeProvider, RegistryTreeItem } from "./views/registryTree";
 import {
   showRegistryDetailPanel,
   showRegistryOverviewPanel,
@@ -130,7 +130,8 @@ export function activate(context: vscode.ExtensionContext): void {
       let currentStep = "binary";
       panel.webview.postMessage({ type: "install-step", step: "binary" });
 
-      const home = process.env.HOME || require("os").homedir();
+      const os = await import("os");
+      const home = process.env.HOME || os.homedir();
       const { access: fsAccess } = await import("fs/promises");
       const exists = (p: string) => fsAccess(p).then(() => true).catch(() => false);
 
@@ -300,6 +301,137 @@ export function activate(context: vscode.ExtensionContext): void {
         }
       );
     }),
+    // ── Hub pull log channel ─────────────────────────────────────────
+    ...(() => {
+      const hubLog = vscode.window.createOutputChannel("dex · Hub");
+
+      function runWithLog(
+        child: import("child_process").ChildProcess,
+        label: string
+      ): Promise<number> {
+        hubLog.appendLine(`\n── ${label} ──  ${new Date().toISOString()}`);
+        child.stdout?.on("data", (data: Buffer) => hubLog.append(data.toString()));
+        child.stderr?.on("data", (data: Buffer) => hubLog.append(data.toString()));
+        return new Promise<number>((resolve) => {
+          child.on("close", (code) => {
+            hubLog.appendLine(`── exit ${code ?? "unknown"} ──`);
+            resolve(code ?? 1);
+          });
+          child.on("error", (err) => {
+            hubLog.appendLine(`── error: ${err.message} ──`);
+            resolve(1);
+          });
+        });
+      }
+
+      return [
+        hubLog,
+        vscode.commands.registerCommand(
+          "modiqo.pullAdapter",
+          async (item: RegistryTreeItem) => {
+            if (!item?.registryAdapter) { return; }
+            const name = item.registryAdapter.name;
+            const ref = `bootstrap/${name}`;
+
+            const installed = await client.adapterList().catch(() => []);
+            if (installed.some((a) => a.id.toLowerCase() === name.toLowerCase())) {
+              const choice = await vscode.window.showWarningMessage(
+                `Adapter "${name}" is already installed. Override with latest from registry?`,
+                { modal: false },
+                "Override",
+                "Cancel"
+              );
+              if (choice !== "Override") { return; }
+            }
+
+            await vscode.window.withProgress(
+              {
+                location: vscode.ProgressLocation.Notification,
+                title: `Pulling adapter ${name}...`,
+                cancellable: false,
+              },
+              async () => {
+                const child = client.installAdapterStream(name);
+                const code = await runWithLog(child, `adapter pull ${ref}`);
+                if (code === 0) {
+                  vscode.window.showInformationMessage(`Adapter ${ref} pulled successfully.`);
+                } else {
+                  const pick = await vscode.window.showErrorMessage(
+                    `Failed to pull adapter ${ref}.`,
+                    "Show Log"
+                  );
+                  if (pick === "Show Log") { hubLog.show(); }
+                }
+              }
+            );
+          }
+        ),
+        vscode.commands.registerCommand(
+          "modiqo.pullFlow",
+          async (item: RegistryTreeItem) => {
+            if (!item?.registrySkill) { return; }
+            const skill = item.registrySkill;
+            const ref = `bootstrap/${skill.name}`;
+
+            const existingFlows = await client.flowList().catch(() => []);
+            if (existingFlows.some((f) => f.name.toLowerCase() === skill.name.toLowerCase())) {
+              vscode.window.showInformationMessage(
+                `Flow "${skill.name}" already exists locally. No action taken.`
+              );
+              return;
+            }
+
+            const bindings = skill.adapter_bindings || [];
+            const adapterIds = bindings.length > 0
+              ? bindings.map((b) => b.adapter_id)
+              : (skill.adapters || []);
+
+            await vscode.window.withProgress(
+              {
+                location: vscode.ProgressLocation.Notification,
+                title: `Pulling flow ${skill.name}...`,
+                cancellable: false,
+              },
+              async (progress) => {
+                if (adapterIds.length > 0) {
+                  const installed = await client.adapterList().catch(() => []);
+                  const installedSet = new Set(
+                    installed.map((a) => a.id.toLowerCase())
+                  );
+
+                  for (const adapterId of adapterIds) {
+                    if (installedSet.has(adapterId.toLowerCase())) {
+                      continue;
+                    }
+                    progress.report({ message: `Pulling required adapter ${adapterId}...` });
+                    const child = client.installAdapterStream(adapterId);
+                    const code = await runWithLog(child, `adapter pull bootstrap/${adapterId} (dep of ${skill.name})`);
+                    if (code !== 0) {
+                      vscode.window.showWarningMessage(
+                        `Adapter ${adapterId} failed to pull — flow may not work correctly.`
+                      );
+                    }
+                  }
+                }
+
+                progress.report({ message: `Pulling flow ${skill.name}...` });
+                const flowChild = client.installFlowStream(ref);
+                const code = await runWithLog(flowChild, `flow pull ${ref}`);
+                if (code === 0) {
+                  vscode.window.showInformationMessage(`Flow ${ref} pulled successfully.`);
+                } else {
+                  const pick = await vscode.window.showErrorMessage(
+                    `Failed to pull flow ${ref}.`,
+                    "Show Log"
+                  );
+                  if (pick === "Show Log") { hubLog.show(); }
+                }
+              }
+            );
+          }
+        ),
+      ] as vscode.Disposable[];
+    })(),
     vscode.commands.registerCommand("modiqo.refreshVault", () => {
       vaultTree.refresh();
     }),

@@ -74,10 +74,16 @@ export interface RegistryAdapter {
   description: string;
 }
 
+export interface AdapterBinding {
+  adapter_id: string;
+  fingerprint: string;
+}
+
 export interface RegistrySkill {
   name: string;
   description: string;
   adapters: string[];
+  adapter_bindings?: AdapterBinding[];
   visibility: string;
 }
 
@@ -748,6 +754,22 @@ export class DexClient {
     child.stdout?.on("data", (data: Buffer) => {
       const text = data.toString();
       if (/\[Y\/n\]|\[y\/N\]/i.test(text)) {
+        child.stdin?.write("y\n");
+      }
+    });
+    child.on("close", () => { child.stdin?.end(); });
+    return child;
+  }
+
+  /** Pull a flow/skill from registry (streaming output).
+   *  Uses `dex registry skill pull <ref>` and auto-confirms prompts. */
+  installFlowStream(ref: string): ChildProcess {
+    const child = spawn(this.dexPath, ["registry", "skill", "pull", ref], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env },
+    });
+    child.stdout?.on("data", (data: Buffer) => {
+      if (/\[Y\/n\]|\[y\/N\]/i.test(data.toString())) {
         child.stdin?.write("y\n");
       }
     });

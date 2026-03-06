@@ -9,6 +9,7 @@ import {
 type RegNodeKind =
   | "status"
   | "login-prompt"
+  | "community"
   | "section"
   | "adapter"
   | "skill"
@@ -49,6 +50,11 @@ export class RegistryTreeItem extends vscode.TreeItem {
           command: "modiqo.registryLogin",
           title: "Login",
         };
+        break;
+
+      case "community":
+        this.iconPath = new vscode.ThemeIcon("organization");
+        this.contextValue = "registry-community";
         break;
 
       case "section":
@@ -158,6 +164,31 @@ export class RegistryTreeProvider
   ): Promise<RegistryTreeItem[]> {
     if (!element) {
       return this.buildRoot();
+    }
+
+    if (element.kind === "community") {
+      const items: RegistryTreeItem[] = [];
+      items.push(
+        new RegistryTreeItem(
+          "section",
+          vscode.TreeItemCollapsibleState.Collapsed,
+          `Adapters (${this.cachedAdapters.length})`,
+          undefined,
+          undefined,
+          this.extUri
+        )
+      );
+      items.push(
+        new RegistryTreeItem(
+          "section",
+          vscode.TreeItemCollapsibleState.Collapsed,
+          `Flows (${this.cachedSkills.length})`,
+          undefined,
+          undefined,
+          this.extUri
+        )
+      );
+      return items;
     }
 
     if (element.kind === "section") {
@@ -335,20 +366,9 @@ export class RegistryTreeProvider
 
     items.push(
       new RegistryTreeItem(
-        "section",
-        vscode.TreeItemCollapsibleState.Collapsed,
-        `Adapters (${this.cachedAdapters.length})`,
-        undefined,
-        undefined,
-        this.extUri
-      )
-    );
-
-    items.push(
-      new RegistryTreeItem(
-        "section",
-        vscode.TreeItemCollapsibleState.Collapsed,
-        `Flows (${this.cachedSkills.length})`,
+        "community",
+        vscode.TreeItemCollapsibleState.Expanded,
+        "Community",
         undefined,
         undefined,
         this.extUri
