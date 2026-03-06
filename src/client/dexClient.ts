@@ -378,11 +378,38 @@ export class DexClient {
     }
   }
 
-  /** Get adapter list — parses text output until --output=json is added */
+  /** Get adapter list via JSON output */
   async adapterList(): Promise<Adapter[]> {
     try {
-      const text = await this.execText(["adapter", "list"]);
-      return this.parseAdapterListText(text);
+      const result = await this.execJson<{
+        total_adapters: number;
+        total_tools: number;
+        adapters: Array<{
+          id: string;
+          name: string;
+          spec_type?: string;
+          tool_count?: number;
+          base_url?: string;
+          fingerprint?: string;
+          status?: string;
+          group?: string;
+          usage?: { total_calls: number; success_rate: number };
+        }>;
+      }>(["adapter", "list", "--json"]);
+      return (result.adapters ?? []).map((a) => ({
+        id: a.id,
+        name: a.name || a.id,
+        group: a.group,
+        has_token: a.status === "ready",
+        tools: a.tool_count,
+        spec_type: a.spec_type,
+        usage: a.usage?.total_calls
+          ? `${a.usage.total_calls} calls`
+          : undefined,
+        success: a.usage?.total_calls
+          ? `${Math.round(a.usage.success_rate * 100)}%`
+          : undefined,
+      }));
     } catch {
       return [];
     }
@@ -1130,78 +1157,6 @@ export class DexClient {
     }
 
     return result;
-  }
-
-  /** Parse adapter list table output into structured data.
-   *  Table format: | ID | Name | Tools | Type | Usage | Success | Status |
-   *  Group header rows like "gsuite (4 adapter...)" have no ID in columns.
-   */
-  private parseAdapterListText(text: string): Adapter[] {
-    const adapters: Adapter[] = [];
-    let currentGroup: string | undefined;
-
-    for (const line of text.split("\n")) {
-      // Skip box-drawing borders and empty lines
-      if (!line.includes("\u2502")) {
-        // Check for group header: "gsuite (4 adapter...)"
-        const groupMatch = line.trim().match(/^(\w+)\s+\(\d+\s+adapter/);
-        if (groupMatch) {
-          currentGroup = groupMatch[1];
-        }
-        continue;
-      }
-
-      // Split table row by │
-      const cells = line
-        .split("\u2502")
-        .map((c) => c.trim())
-        .filter((c) => c.length > 0);
-      if (cells.length < 2) {
-        continue;
-      }
-
-      const id = cells[0];
-      const name = cells[1];
-
-      // Skip header row
-      if (id === "ID" || id === "Name") {
-        continue;
-      }
-
-      // Skip group header rows (id contains "(" like "gsuite (4 adapter...)")
-      if (id.includes("(") || id.includes("adapter")) {
-        const gm = id.match(/^(\w+)/);
-        if (gm) {
-          currentGroup = gm[1];
-        }
-        continue;
-      }
-
-      // Must have a non-empty ID starting with a letter
-      if (!id || !id.match(/^[a-z]/i)) {
-        continue;
-      }
-
-      const tools = cells.length >= 3 ? parseInt(cells[2], 10) || 0 : 0;
-      const specType = cells.length >= 4 ? cells[3] : "";
-      const usage = cells.length >= 5 ? cells[4] : "";
-      const success = cells.length >= 6 ? cells[5] : "";
-      const status = cells.length >= 7 ? cells[6] : "";
-      const hasToken = status.includes("\u2713") || status.includes("ready");
-
-      adapters.push({
-        id,
-        name: name || id,
-        group: currentGroup,
-        has_token: hasToken,
-        tools,
-        spec_type: specType || undefined,
-        usage: usage || undefined,
-        success: success || undefined,
-      });
-    }
-
-    return adapters;
   }
 
   /** Parse catalog list text output */
