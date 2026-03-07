@@ -305,6 +305,9 @@ async function handleInstallAdapters(
       });
     }
   }
+
+  // Pull standalone bootstrap flows (not tied to any adapter)
+  await client.pullStandaloneFlows();
 }
 
 function handleOAuthGoogle(
@@ -3435,6 +3438,7 @@ function renderWire(el) {
     { name: 'Playwright', desc: 'Browser automation' },
     { name: 'Chrome DevTools', desc: 'DevTools protocol' },
     { name: 'Filesystem', desc: 'Sandboxed file access' },
+    { name: 'DuckDB', desc: 'Archive analytics (read-only)' },
   ];
   let mcpItems = stdioServers.map(s => \`
     <div class="mcp-item">

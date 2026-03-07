@@ -855,6 +855,36 @@ export class DexClient {
     return count;
   }
 
+  /** Pull standalone bootstrap flows that are not tied to any adapter.
+   *  These are cross-cutting flows like archive-analytics that use
+   *  stdio servers rather than a single adapter endpoint. */
+  async pullStandaloneFlows(): Promise<number> {
+    const standaloneFlows = ["bootstrap/archive-analytics"];
+    let count = 0;
+    for (const flowRef of standaloneFlows) {
+      try {
+        const child = spawn(this.dexPath, ["registry", "skill", "pull", flowRef], {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: { ...process.env },
+        });
+        child.stdout?.on("data", (data: Buffer) => {
+          if (/\[Y\/n\]|\[y\/N\]/i.test(data.toString())) {
+            child.stdin?.write("y\n");
+          }
+        });
+        child.on("close", () => { child.stdin?.end(); });
+        const code = await new Promise<number | null>((resolve) => {
+          child.on("close", resolve);
+          child.on("error", () => resolve(1));
+        });
+        if (code === 0) { count++; }
+      } catch {
+        // Skip failures silently
+      }
+    }
+    return count;
+  }
+
   /** Run OAuth setup for Google (opens browser for consent) */
   oauthSetupGoogle(scopes: string[]): ChildProcess {
     const args = ["oauth", "setup", "google", "--scopes", scopes.join(",")];
@@ -1055,44 +1085,58 @@ export class DexClient {
     const configDir = path.join(homeDir, ".dex", "config");
     const mcpPath = path.join(configDir, "mcp.json");
 
-    // Only write if mcp.json doesn't exist or has no servers
-    let needsWrite = true;
+    const baselineServers: Record<string, { command: string; args: string[] }> = {
+      "playwright-headed": {
+        command: "npx",
+        args: ["-y", "@playwright/mcp@latest", "--browser", "chrome", "--no-sandbox"],
+      },
+      "playwright-nosandbox": {
+        command: "npx",
+        args: ["-y", "@playwright/mcp@latest", "--browser", "chrome", "--no-sandbox", "--headless"],
+      },
+      "chrome-devtools-headed": {
+        command: "npx",
+        args: ["chrome-devtools-mcp@latest", "--chromeArg=--no-sandbox", "--chromeArg=--disable-setuid-sandbox"],
+      },
+      "chrome-devtools-nosandbox": {
+        command: "npx",
+        args: ["chrome-devtools-mcp@latest", "--headless", "--chromeArg=--no-sandbox", "--chromeArg=--disable-setuid-sandbox"],
+      },
+      filesystem: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      },
+      "duckdb-readonly": {
+        command: "uvx",
+        args: [
+          "mcp-server-motherduck",
+          "--db-path",
+          path.join(homeDir, ".dex", "dex", "archives", "archive.duckdb"),
+        ],
+      },
+    };
+
+    // Read existing config or start fresh
+    let existing: { mcpServers?: Record<string, unknown> } = {};
     try {
-      const existing = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
-      const servers = existing?.mcpServers;
-      if (servers && Object.keys(servers).length > 0) {
-        needsWrite = false;
-      }
+      existing = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
     } catch {
       // File doesn't exist or invalid JSON
     }
 
-    if (needsWrite) {
-      const mcpConfig = {
-        mcpServers: {
-          "playwright-headed": {
-            command: "npx",
-            args: ["-y", "@playwright/mcp@latest", "--browser", "chrome", "--no-sandbox"],
-          },
-          "playwright-nosandbox": {
-            command: "npx",
-            args: ["-y", "@playwright/mcp@latest", "--browser", "chrome", "--no-sandbox", "--headless"],
-          },
-          "chrome-devtools-headed": {
-            command: "npx",
-            args: ["chrome-devtools-mcp@latest", "--chromeArg=--no-sandbox", "--chromeArg=--disable-setuid-sandbox"],
-          },
-          "chrome-devtools-nosandbox": {
-            command: "npx",
-            args: ["chrome-devtools-mcp@latest", "--headless", "--chromeArg=--no-sandbox", "--chromeArg=--disable-setuid-sandbox"],
-          },
-          filesystem: {
-            command: "npx",
-            args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-          },
-        },
-      };
+    const servers = existing?.mcpServers ?? {};
+    let changed = false;
 
+    // Merge missing baseline servers into existing config
+    for (const [name, config] of Object.entries(baselineServers)) {
+      if (!(name in servers)) {
+        (servers as Record<string, unknown>)[name] = config;
+        changed = true;
+      }
+    }
+
+    if (changed || Object.keys(servers).length === 0) {
+      const mcpConfig = { mcpServers: servers };
       if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
       }
